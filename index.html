@@ -248,68 +248,37 @@
     }
     
     // Lógica da Pesquisa
-    finishListBtn.addEventListener('click', function() {
-        if (selectedPassengers.length === 0) {
-            alert('A lista está vazia! Adicione passageiros para gerar o Excel.');
+    searchInput.addEventListener('input', function() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        searchResultsDiv.innerHTML = ''; // Limpa resultados
+
+        if (searchTerm.length < 2) {
+            searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
             return;
         }
 
-        // 1. Definição dos Cabeçalhos em Maiúsculas
-        const headers = [
-            'NOME',
-            'CPF',
-            'DATA DE NASCIMENTO',
-            'ENDEREÇO',
-            'TELEFONE'
-        ];
-
-        // 2. Mapeia os dados para a planilha, na ordem correta
-        const dataForSheet = selectedPassengers.map(person => ([
-            person.nome,
-            person.cpf,
-            person.data_nascimento,
-            person.endereco,
-            person.telefone,
-        ]));
-
-        // 3. Adiciona os cabeçalhos como a primeira linha dos dados
-        dataForSheet.unshift(headers);
-
-        // 4. Cria a planilha a partir do array de arrays
-        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
-
-        // 5. Aplica a LARGURA DAS COLUNAS (colwidths)
-        worksheet['!cols'] = [
-            { wch: 30 }, // Coluna A: Nome
-            { wch: 18 }, // Coluna B: CPF
-            { wch: 22 }, // Coluna C: Data de Nascimento
-            { wch: 40 }, // Coluna D: Endereço
-            { wch: 20 }  // Coluna E: Telefone
-        ];
-
-        // 6. Aplica Estilos aos Cabeçalhos (A1 até E1)
-        
-        headers.forEach((header, index) => {
-            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index }); // Linha 1 (index 0)
+        const results = database.filter(person => {
+            const isSelected = selectedPassengers.some(p => p.id === person.id);
+            if (isSelected) return false; // Não exibe quem já está selecionado
             
-            // Garante que a célula exista e é uma string
-            if(worksheet[cellAddress]) {
-                worksheet[cellAddress].t = 's'; // Define tipo como string
-                // Nota: Estilos como negrito e alinhamento centralizado exigem o atributo "s" 
-                // (que representa style), mas a versão CDN não o suporta diretamente sem 
-                // o uso de JSON Style Objects mais complexos. 
-                // A largura da coluna e o texto MAIÚSCULO já melhoram muito a visualização.
-            }
+            return person.nome.toLowerCase().includes(searchTerm) || 
+                   person.cpf.toLowerCase().includes(searchTerm);
         });
 
-        // 7. Cria o livro de trabalho e salva
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Passageiros');
-
-        // Gera e salva o arquivo Excel (.xlsx)
-        XLSX.writeFile(workbook, 'Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '.xlsx');
-        
-        alert(`Arquivo Excel com ${selectedPassengers.length} passageiros gerado com sucesso!`);
+        if (results.length === 0) {
+            searchResultsDiv.innerHTML = '<p>Nenhum resultado encontrado ou todos já selecionados.</p>';
+        } else {
+            results.forEach(person => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'list-item';
+                
+                resultDiv.innerHTML = `
+                    <span>${person.nome} (${person.cpf})</span>
+                    <button onclick='addPassengerToList(${JSON.stringify(person)})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
+                `;
+                searchResultsDiv.appendChild(resultDiv);
+            });
+        }
     });
 
     // ----------------------------------------------------
@@ -417,26 +386,78 @@
     // LÓGICA DE GERAÇÃO DO EXCEL
     // ----------------------------------------------------
 
+    // Substitua todo o bloco de código do listener finishListBtn.addEventListener
     finishListBtn.addEventListener('click', function() {
         if (selectedPassengers.length === 0) {
             alert('A lista está vazia! Adicione passageiros para gerar o Excel.');
             return;
         }
 
-        // Mapeia os dados do JSON para o formato de planilha
-        const dataForExcel = selectedPassengers.map(person => ({
-            'Nome': person.nome,
-            'CPF': person.cpf,
-            'Data de Nascimento': person.data_nascimento, // Usa o nome da coluna do banco
-            'Endereço': person.endereco,
-            'Telefone': person.telefone,
-        }));
+        // 1. Definição dos Cabeçalhos em Maiúsculas
+        const headers = [
+            'NOME',
+            'CPF',
+            'DATA DE NASCIMENTO',
+            'ENDEREÇO',
+            'TELEFONE'
+        ];
+
+        // 2. Mapeia os dados para a planilha, na ordem correta
+        const dataForSheet = selectedPassengers.map(person => ([
+            person.nome,
+            person.cpf,
+            person.data_nascimento,
+            person.endereco,
+            person.telefone,
+        ]));
+
+        // 3. Adiciona os cabeçalhos como a primeira linha dos dados
+        dataForSheet.unshift(headers);
+
+        // 4. Cria a planilha a partir do array de arrays
+        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
+
+        // 5. Aplica a LARGURA DAS COLUNAS (colwidths)
+        worksheet['!cols'] = [
+            { wch: 30 }, // Coluna A: Nome
+            { wch: 18 }, // Coluna B: CPF
+            { wch: 22 }, // Coluna C: Data de Nascimento
+            { wch: 40 }, // Coluna D: Endereço
+            { wch: 20 }  // Coluna E: Telefone
+        ];
+
+        // 6. Aplica Estilos aos Cabeçalhos (A1 até E1)
         
-        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+        // ATENÇÃO: Os estilos no SheetJS (XLSX) só funcionam quando o arquivo é gerado
+        // no formato XLSM (Macro-Enabled Workbook) ou XLSX, mas o estilo simples de negrito
+        // e centralização pode ser um pouco complexo de aplicar diretamente APENAS na versão Lite/CDN.
+        // Para garantir o estilo sem bibliotecas adicionais, faremos uma alteração que garante
+        // pelo menos a definição de tipo de célula e tentaremos forçar o negrito.
+
+        // A forma mais estável de definir estilos complexos exigiria o uso da biblioteca Pro ou
+        // o uso de um módulo node.js. No navegador, vamos focar na largura e nos cabeçalhos.
+        
+        // Para simplificar e garantir que o negrito funcione na maioria dos casos,
+        // vamos garantir que as células do cabeçalho sejam tratadas como strings:
+        
+        headers.forEach((header, index) => {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index }); // Linha 1 (index 0)
+            
+            // Garante que a célula exista e é uma string
+            if(worksheet[cellAddress]) {
+                worksheet[cellAddress].t = 's'; // Define tipo como string
+                // Nota: Estilos como negrito e alinhamento centralizado exigem o atributo "s" 
+                // (que representa style), mas a versão CDN não o suporta diretamente sem 
+                // o uso de JSON Style Objects mais complexos. 
+                // A largura da coluna e o texto MAIÚSCULO já melhoram muito a visualização.
+            }
+        });
+
+        // 7. Cria o livro de trabalho e salva
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Passageiros');
 
-        // Gera e salva o arquivo Excel
+        // Gera e salva o arquivo Excel (.xlsx)
         XLSX.writeFile(workbook, 'Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '.xlsx');
         
         alert(`Arquivo Excel com ${selectedPassengers.length} passageiros gerado com sucesso!`);
