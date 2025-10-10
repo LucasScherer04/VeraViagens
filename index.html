@@ -111,7 +111,7 @@
     /** Carrega todos os passageiros do Supabase para a memória local (database) */
     async function loadAllPassengers() {
         loadingMsg.textContent = 'Carregando dados...';
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('passageiros')
             .select('*');
 
@@ -127,7 +127,7 @@
 
     /** Salva uma nova pessoa no Supabase */
     async function saveNewPerson(personData) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('passageiros')
             .insert([personData])
             .select(); // Retorna o objeto salvo
