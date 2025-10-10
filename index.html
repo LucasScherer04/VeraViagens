@@ -6,6 +6,8 @@
     <title>Lista de Passageiros com Supabase</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     
     <style>
         /* CSS MÍNIMO PARA FUNCIONALIDADE */
@@ -386,72 +388,74 @@
     // LÓGICA DE GERAÇÃO DO EXCEL
     // ----------------------------------------------------
 
-    // Substitua todo o bloco de código do listener finishListBtn.addEventListener
-        finishListBtn.addEventListener('click', function() {
+   finishListBtn.addEventListener('click', function() {
         if (selectedPassengers.length === 0) {
-            alert('A lista está vazia! Adicione passageiros para gerar o Excel.');
+            alert('A lista está vazia! Adicione passageiros para gerar o documento.');
             return;
         }
 
-        // 1. Definição dos Cabeçalhos em Maiúsculas
-        const headers = [
-            'NOME',
-            'CPF',
-            'DATA DE NASCIMENTO',
-            'ENDEREÇO',
-            'TELEFONE'
-        ];
-
-        // 2. Mapeia os dados para a planilha
+        // --- PARTE DE EXPORTAÇÃO XLSX (MANTIDA SEM ESTILO AVANÇADO) ---
+        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
         const dataForSheet = selectedPassengers.map(person => ([
-            person.nome,
-            person.cpf,
-            person.data_nascimento,
-            person.endereco,
-            person.telefone,
+            person.nome, person.cpf, person.data_nascimento, person.endereco, person.telefone,
         ]));
-
-        // Adiciona os cabeçalhos como a primeira linha
-        dataForSheet.unshift(headers);
-
-        // Cria a planilha
+        dataForSheet.unshift(headersXLSX);
         const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
-
-        // 3. Aplica a LARGURA DAS COLUNAS (que já está funcionando bem)
-        worksheet['!cols'] = [
-            { wch: 30 }, // Coluna A: Nome
-            { wch: 18 }, // Coluna B: CPF
-            { wch: 22 }, // Coluna C: Data de Nascimento
-            { wch: 40 }, // Coluna D: Endereço
-            { wch: 20 }  // Coluna E: Telefone
-        ];
-
-        // 4. APLICAÇÃO DE ESTILOS AVANÇADOS (Negrito e Centralização)
-        const headerStyle = {
-            font: { bold: true },
-            alignment: { horizontal: "center", vertical: "center" }
-        };
-
-        // Percorre as células do cabeçalho (A1 a E1) e anexa o objeto de estilo
-        ['A1', 'B1', 'C1', 'D1', 'E1'].forEach(cellAddress => {
-            if (!worksheet[cellAddress]) {
-                // Cria a célula se ela não existir (geralmente não é o caso aqui)
-                worksheet[cellAddress] = { v: '', t: 's' };
-            }
-            
-            // Anexa o objeto de estilo (isso exige suporte interno do XLSX.js)
-            worksheet[cellAddress].s = headerStyle;
-        });
-
-
-        // 5. Cria o livro de trabalho e salva
+        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Passageiros');
-
-        // Gera e salva o arquivo Excel (.xlsx)
         XLSX.writeFile(workbook, 'Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '.xlsx');
         
-        alert(`Arquivo Excel com ${selectedPassengers.length} passageiros gerado com sucesso!`);
+        
+        // --- PARTE NOVA: EXPORTAÇÃO PDF COM ESTILOS PERFEITOS (Negrito e Centralizado) ---
+
+        // Cria o documento PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Configura o cabeçalho para o PDF
+        const headersPDF = [
+            { header: 'NOME', dataKey: 'nome' },
+            { header: 'CPF', dataKey: 'cpf' },
+            { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
+            { header: 'ENDEREÇO', dataKey: 'endereco' },
+            { header: 'TELEFONE', dataKey: 'telefone' }
+        ];
+
+        // Converte os dados no formato que o AutoTable entende
+        const dataPDF = selectedPassengers.map(person => ({
+            nome: person.nome,
+            cpf: person.cpf,
+            data_nascimento: person.data_nascimento,
+            endereco: person.endereco,
+            telefone: person.telefone
+        }));
+
+        doc.autoTable({
+            head: [headersPDF.map(h => h.header)], // Usa os cabeçalhos definidos
+            body: dataPDF.map(obj => Object.values(obj)),
+            
+            // Estilos para o Cabeçalho (Negrito e Centralizado)
+            headStyles: { 
+                fillColor: [50, 100, 150], // Cor de fundo do título (opcional)
+                textColor: 255, // Texto branco
+                fontStyle: 'bold', // Negrito
+                halign: 'center', // Alinhamento horizontal centralizado
+                valign: 'middle', // Alinhamento vertical centralizado
+                fontSize: 10
+            },
+            // Estilos para o Conteúdo (Body)
+            bodyStyles: {
+                fontSize: 8
+            },
+            startY: 20,
+            margin: { top: 10 }
+        });
+
+        // Salva o arquivo PDF
+        doc.save('Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '.pdf');
+
+        alert('Arquivos XLSX (sem estilo) e PDF (com estilo perfeito) gerados com sucesso!');
     });
 
     // ----------------------------------------------------
