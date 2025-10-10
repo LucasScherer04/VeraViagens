@@ -43,9 +43,15 @@
     </div>
     
     <hr>
+    
 
     <div class="person-list">
         <h2>Passageiros Selecionados</h2>
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
+            <label for="tripDestination" style="font-weight: bold; display: block; margin-bottom: 5px;">Destino da Viagem (Nome do Arquivo):</label>
+            <input type="text" id="tripDestination" placeholder="Ex: Salvador - BA (Ônibus 1)" required 
+                style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #aaa; border-radius: 4px;">
+        </div>
         <div id="selectedPassengers">
             <p id="emptyListMsg">Nenhuma pessoa selecionada.</p>
         </div>
@@ -389,8 +395,17 @@
     // ----------------------------------------------------
 
    finishListBtn.addEventListener('click', function() {
+        const destinationInput = document.getElementById('tripDestination');
+        const destination = destinationInput.value.trim();
+
+        if (!destination) {
+            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
+            destinationInput.focus();
+            return;
+        }
+
         if (selectedPassengers.length === 0) {
-            alert('A lista está vazia! Adicione passageiros para gerar o documento.');
+            alert('A lista está vazia! Adicione passageiros para gerar os documentos.');
             return;
         }
 
@@ -404,8 +419,11 @@
             return dateString;
         }
 
-        // --- PARTE 1: EXPORTAÇÃO XLSX ---
-        
+        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+
+        // ----------------------------------------------------
+        // 1. GERAÇÃO DA LISTA COMPLETA (XLSX) - Nome: [Destino]_COMPLETO.xlsx
+        // ----------------------------------------------------
         const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
         
         const dataForSheet = selectedPassengers.map(person => ([
@@ -421,17 +439,20 @@
         worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
         
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Passageiros');
-        XLSX.writeFile(workbook, 'Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '.xlsx');
-        
-        
-        // --- PARTE 2: EXPORTAÇÃO PDF COM ESTILOS E FORMATO PAISAGEM ---
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista Completa');
+        XLSX.writeFile(workbook, `${baseFileName}_COMPLETO.xlsx`);
 
+
+        // ----------------------------------------------------
+        // 2. GERAÇÃO DA LISTA COMPLETA (PDF PAISAGEM) - Nome: [Destino]_COMPLETO.pdf
+        // ----------------------------------------------------
+        
         const { jsPDF } = window.jspdf;
         
-        const doc = new jsPDF('landscape', 'mm', 'a4'); // Formato A4 Paisagem
+        // PDF COMPLETO: Paisagem
+        const docCompleto = new jsPDF('landscape', 'mm', 'a4'); 
         
-        const headersPDF = [
+        const headersCompleto = [
             { header: 'NOME', dataKey: 'nome' },
             { header: 'CPF', dataKey: 'cpf' },
             { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
@@ -439,7 +460,7 @@
             { header: 'TELEFONE', dataKey: 'telefone' }
         ];
 
-        const dataPDF = selectedPassengers.map(person => ({
+        const dataPDFCompleto = selectedPassengers.map(person => ({
             nome: person.nome,
             cpf: person.cpf,
             data_nascimento: formatDateToBrazilian(person.data_nascimento),
@@ -447,41 +468,58 @@
             telefone: person.telefone
         }));
 
-        doc.autoTable({
-            head: [headersPDF.map(h => h.header)],
-            body: dataPDF.map(obj => Object.values(obj)),
-            
-            headStyles: { 
-                fontStyle: 'bold', 
-                halign: 'center', 
-                valign: 'middle', 
-                lineWidth: 0.1, 
-                lineColor: [0, 0, 0], 
-                fontSize: 10,
-                fillColor: [230, 230, 230],
-                textColor: [0, 0, 0]
-            },
-            bodyStyles: {
-                fontSize: 9,
-                lineWidth: 0.1,
-                lineColor: [0, 0, 0],
-                textColor: [0, 0, 0],
-            },
-            // CORREÇÃO: AUMENTANDO A LARGURA DA COLUNA 'ENDEREÇO' PARA OCUPAR O ESPAÇO
+        docCompleto.autoTable({
+            head: [headersCompleto.map(h => h.header)],
+            body: dataPDFCompleto.map(obj => Object.values(obj)),
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
+            bodyStyles: { fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
             columnStyles: {
-                0: { cellWidth: 45 },  // NOME
-                1: { cellWidth: 30, halign: 'center' }, // CPF
-                2: { cellWidth: 35, halign: 'center' }, // DATA DE NASCIMENTO
-                3: { cellWidth: 140 }, // ENDEREÇO
-                4: { cellWidth: 30, halign: 'center' }   // TELEFONE
+                0: { cellWidth: 45 }, 
+                1: { cellWidth: 30, halign: 'center' }, 
+                2: { cellWidth: 35, halign: 'center' }, 
+                3: { cellWidth: 140}, 
+                4: { cellWidth: 30, halign: 'center' }
             },
             startY: 20,
-            margin: { top: 10, left: 10, right: 10 } // Margens iguais para um visual limpo
+            margin: { top: 10, left: 10, right: 10 }
         });
 
-        doc.save('Lista_Passageiros_' + new Date().toISOString().slice(0, 10) + '_PAISAGEM.pdf');
+        docCompleto.save(`${baseFileName}_COMPLETO.pdf`);
 
-        alert('Arquivos XLSX e PDF (com datas formatadas e PDF otimizado) gerados com sucesso!');
+
+        // ----------------------------------------------------
+        // 3. GERAÇÃO DA LISTA SIMPLES (PDF RETRATO) - Nome: [Destino]_ONIBUS.pdf
+        // ----------------------------------------------------
+
+        // PDF SIMPLES: Retrato
+        const docSimples = new jsPDF('portrait', 'mm', 'a4'); 
+
+        const headersSimples = [
+            { header: 'NOME', dataKey: 'nome' },
+            { header: 'CPF', dataKey: 'cpf' }
+        ];
+
+        const dataPDFSimples = selectedPassengers.map(person => ({
+            nome: person.nome,
+            cpf: person.cpf
+        }));
+
+        docSimples.autoTable({
+            head: [headersSimples.map(h => h.header)],
+            body: dataPDFSimples.map(obj => Object.values(obj)),
+            
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 10, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
+            bodyStyles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
+            
+            columnStyles: {
+                0: { cellWidth: 100 }, // NOME
+                1: { cellWidth: 50, halign: 'center' } // CPF
+            },
+            startY: 20,
+            margin: { top: 10, left: 30, right: 30 } // Margens maiores para centralizar o conteúdo simples
+        });
+
+        docSimples.save(`${baseFileName}_ONIBUS.pdf`);
     });
 
     // ----------------------------------------------------
