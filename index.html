@@ -14,6 +14,26 @@
         body { font-family: sans-serif; margin: 20px; background-color: #f0f2f5; }
         .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         h1, h2 { color: #1e88e5; }
+        /* --- NOVOS ESTILOS PARA A LOGO --- */
+        .header-container {
+            display: flex;             /* Usa flexbox para alinhar itens lado a lado */
+            justify-content: space-between; /* Espaço máximo entre o título e a logo */
+            align-items: center;       /* Centraliza verticalmente */
+            border-bottom: 2px solid #1e88e5; /* Mantém a linha de baixo do h1 original */
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header-container h1 {
+            color: #1e88e5;
+            border-bottom: none; /* Remove a borda de baixo do h1 para que fique apenas no container */
+            padding-bottom: 0;
+        }
+
+        .site-logo {
+            max-height: 50px; /* Define um tamanho máximo para a altura da logo */
+            width: auto;     /* Mantém a proporção */
+        }
         input[type="text"], input[type="date"] { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
         button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-top: 10px; }
         #addPersonBtn { background-color: #4caf50; }
@@ -29,9 +49,11 @@
 <body>
 
 <div class="container">
-    <h1>Vera Viagens - Lista de Passageiros</h1>
-
-    <button id="addPersonBtn">Adicionar Nova Pessoa</button>
+    <div class="header-container">
+        <h1>Vera Viagens - Lista de Passageiros</h1>
+        <img src="logo.png" alt="Logo da Vera Viagens" class="site-logo">
+    </div>
+    <button id="addPersonBtn">Adicionar Nova Pessoa ao Banco</button>
     <hr>
 
     <div class="search-area">
