@@ -80,6 +80,33 @@
     </div>
 </div>
 
+<div id="editPersonModal" class="modal">
+    <div class="modal-content">
+        <span class="close-edit-btn">&times;</span>
+        <h2>Editar Pessoa</h2>
+        <form id="editPersonForm">
+            <input type="hidden" id="edit-id"> 
+
+            <label for="edit-nome">Nome:</label>
+            <input type="text" id="edit-nome" required><br>
+
+            <label for="edit-cpf">CPF:</label>
+            <input type="text" id="edit-cpf" required><br>
+
+            <label for="edit-nascimento">Data de Nascimento:</label>
+            <input type="date" id="edit-nascimento" required><br>
+
+            <label for="edit-endereco">Endereço:</label>
+            <input type="text" id="edit-endereco" required><br>
+
+            <label for="edit-telefone">Telefone:</label>
+            <input type="text" id="edit-telefone" required><br>
+
+            <button type="submit" style="background-color: #f39c12;">Salvar Alterações</button>
+        </form>
+    </div>
+</div>
+
 <script>
     // =======================================================
     // ⚠️ ATENÇÃO: SUBSTITUA SUAS CHAVES AQUI! ⚠️
@@ -109,6 +136,23 @@
     // ----------------------------------------------------
 
     /** Carrega todos os passageiros do Supabase para a memória local (database) */
+    /** Atualiza uma pessoa existente no Supabase */
+    async function updateExistingPerson(personData, id) {
+        const { data, error } = await supabaseClient
+            .from('passageiros')
+            .update(personData)
+            .eq('id', id) // Diz ao Supabase para atualizar a linha com este ID
+            .select();
+
+        if (error) {
+            console.error('Erro ao atualizar:', error);
+            alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
+            return null;
+        }
+        
+        // Retorna o objeto atualizado
+        return data[0]; 
+    }
     async function loadAllPassengers() {
         loadingMsg.textContent = 'Carregando dados...';
         const { data, error } = await supabaseClient
@@ -151,24 +195,32 @@
 
     /** Atualiza a lista de selecionados na tela */
     function updateSelectedListDisplay() {
-        selectedPassengersDiv.innerHTML = '';
+    selectedPassengersDiv.innerHTML = '';
         if (selectedPassengers.length === 0) {
             emptyListMsg.style.display = 'block';
             finishListBtn.disabled = true;
         } else {
             emptyListMsg.style.display = 'none';
             finishListBtn.disabled = false;
-            
+        
             selectedPassengers.forEach(person => {
                 const item = document.createElement('div');
                 item.className = 'list-item';
+            
+                // Botões de Ação
+                const actionButtons = document.createElement('span');
+                actionButtons.innerHTML = `
+                    <button onclick="openEditModal(${person.id})" style="background-color: #f39c12; padding: 5px 10px; margin-right: 5px;">Editar</button>
+                    <button onclick="removePassengerFromList(${person.id})" style="background-color: #dc3545; padding: 5px 10px;">Remover</button>
+                `;
+
                 item.innerHTML = `
                     <span>
                         <input type="checkbox" checked disabled> 
                         <strong>${person.nome}</strong> | CPF: ${person.cpf}
                     </span>
-                    <button onclick="removePassengerFromList(${person.id})" style="background-color: #dc3545; padding: 5px 10px;">Remover</button>
                 `;
+                item.appendChild(actionButtons); // Adiciona os botões de ação
                 selectedPassengersDiv.appendChild(item);
             });
         }
@@ -238,6 +290,74 @@
     // Fecha o Modal
     document.getElementsByClassName('close-btn')[0].onclick = function() { modal.style.display = 'none'; }
     window.onclick = function(event) { if (event.target == modal) { modal.style.display = 'none'; } }
+    // --- NOVAS REFERÊNCIAS ---
+    const editModal = document.getElementById('editPersonModal');
+    const editForm = document.getElementById('editPersonForm');
+    const closeEditBtn = document.getElementsByClassName('close-edit-btn')[0];
+
+    // Abre o modal de edição e preenche os campos com os dados atuais
+    window.openEditModal = function(id) {
+        // 1. Encontra a pessoa no banco de dados local (database)
+        const personToEdit = database.find(p => p.id === id);
+        if (!personToEdit) {
+            alert('Passageiro não encontrado.');
+            return;
+        }
+
+        // 2. Preenche o formulário
+        document.getElementById('edit-id').value = personToEdit.id;
+        document.getElementById('edit-nome').value = personToEdit.nome;
+        document.getElementById('edit-cpf').value = personToEdit.cpf;
+        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
+        document.getElementById('edit-endereco').value = personToEdit.endereco;
+        document.getElementById('edit-telefone').value = personToEdit.telefone;
+
+        // 3. Exibe o modal
+        editModal.style.display = 'block';
+    };
+
+    // Fecha o Modal de Edição (X)
+    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
+
+    // Envio do Formulário de Edição (Salva no Supabase e atualiza a interface)
+    editForm.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+
+        const id = parseInt(document.getElementById('edit-id').value);
+        
+        const updatedData = {
+            nome: document.getElementById('edit-nome').value,
+            cpf: document.getElementById('edit-cpf').value,
+            data_nascimento: document.getElementById('edit-nascimento').value,
+            endereco: document.getElementById('edit-endereco').value,
+            telefone: document.getElementById('edit-telefone').value,
+        };
+
+        // 1. Chama a função de atualização do Supabase
+        const savedPerson = await updateExistingPerson(updatedData, id);
+
+        if (savedPerson) {
+            alert(`Informações de "${savedPerson.nome}" salvas com sucesso!`);
+            
+            // 2. Atualiza os dados na cópia local (database)
+            const dbIndex = database.findIndex(p => p.id === id);
+            if (dbIndex !== -1) {
+                database[dbIndex] = savedPerson;
+            }
+
+            // 3. Atualiza os dados na lista de selecionados (selectedPassengers)
+            const selIndex = selectedPassengers.findIndex(p => p.id === id);
+            if (selIndex !== -1) {
+                selectedPassengers[selIndex] = savedPerson;
+            }
+
+            // 4. Recarrega as listas
+            updateSelectedListDisplay();
+            
+            // 5. Fecha o modal
+            editModal.style.display = 'none';
+        }
+    });
 
     // Envio do Formulário (Salva no Supabase)
     form.onsubmit = async function(e) {
