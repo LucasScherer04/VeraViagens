@@ -196,7 +196,6 @@
         }
 
         database = data;
-        loadingMsg.textContent = `Total de ${database.length} pessoas salvas.`;
     }
 
     /** Salva uma nova pessoa no Supabase */
@@ -281,11 +280,6 @@
     searchInput.addEventListener('input', function() {
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; // Limpa resultados
-
-        if (searchTerm.length < 2) {
-            searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar.</p>';
-            return;
-        }
 
         const results = database.filter(person => {
             const isSelected = selectedPassengers.some(p => p.id === person.id);
