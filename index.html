@@ -31,13 +31,13 @@
 <div class="container">
     <h1>Vera Viagens - Lista de Passageiros</h1>
 
-    <button id="addPersonBtn">Adicionar Nova Pessoa ao Banco</button>
+    <button id="addPersonBtn">Adicionar Nova Pessoa</button>
     <hr>
 
     <div class="search-area">
         <h2>Pesquisar e Selecionar</h2>
         <input type="text" id="searchInput" placeholder="Pesquisar por Nome ou CPF...">
-        <p id="loadingMsg">Carregando banco de dados...</p>
+        <p id="loadingMsg">Carregando passageiros...</p>
         <div id="searchResults">
             </div>
     </div>
@@ -53,7 +53,7 @@
     
     <hr>
 
-    <button id="finishListBtn" disabled>Finalizar Lista e Gerar Excel</button>
+    <button id="finishListBtn" disabled>Finalizar Lista</button>
 </div>
 
 
@@ -255,7 +255,7 @@
         searchResultsDiv.innerHTML = ''; // Limpa resultados
 
         if (searchTerm.length < 2) {
-            searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
+            searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar.</p>';
             return;
         }
 
@@ -457,14 +457,15 @@
                 valign: 'middle', 
                 lineWidth: 0.1, 
                 lineColor: [0, 0, 0], 
-                fontSize: 9,
+                fontSize: 10,
                 fillColor: [230, 230, 230],
                 textColor: [0, 0, 0]
             },
             bodyStyles: {
-                fontSize: 8,
+                fontSize: 9,
                 lineWidth: 0.1,
                 lineColor: [0, 0, 0],
+                textColor: [0, 0, 0],
             },
             // CORREÇÃO: AUMENTANDO A LARGURA DA COLUNA 'ENDEREÇO' PARA OCUPAR O ESPAÇO
             columnStyles: {
