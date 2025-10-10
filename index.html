@@ -387,7 +387,7 @@
     // ----------------------------------------------------
 
     // Substitua todo o bloco de código do listener finishListBtn.addEventListener
-    finishListBtn.addEventListener('click', function() {
+        finishListBtn.addEventListener('click', function() {
         if (selectedPassengers.length === 0) {
             alert('A lista está vazia! Adicione passageiros para gerar o Excel.');
             return;
@@ -402,7 +402,7 @@
             'TELEFONE'
         ];
 
-        // 2. Mapeia os dados para a planilha, na ordem correta
+        // 2. Mapeia os dados para a planilha
         const dataForSheet = selectedPassengers.map(person => ([
             person.nome,
             person.cpf,
@@ -411,13 +411,13 @@
             person.telefone,
         ]));
 
-        // 3. Adiciona os cabeçalhos como a primeira linha dos dados
+        // Adiciona os cabeçalhos como a primeira linha
         dataForSheet.unshift(headers);
 
-        // 4. Cria a planilha a partir do array de arrays
+        // Cria a planilha
         const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
 
-        // 5. Aplica a LARGURA DAS COLUNAS (colwidths)
+        // 3. Aplica a LARGURA DAS COLUNAS (que já está funcionando bem)
         worksheet['!cols'] = [
             { wch: 30 }, // Coluna A: Nome
             { wch: 18 }, // Coluna B: CPF
@@ -426,34 +426,25 @@
             { wch: 20 }  // Coluna E: Telefone
         ];
 
-        // 6. Aplica Estilos aos Cabeçalhos (A1 até E1)
-        
-        // ATENÇÃO: Os estilos no SheetJS (XLSX) só funcionam quando o arquivo é gerado
-        // no formato XLSM (Macro-Enabled Workbook) ou XLSX, mas o estilo simples de negrito
-        // e centralização pode ser um pouco complexo de aplicar diretamente APENAS na versão Lite/CDN.
-        // Para garantir o estilo sem bibliotecas adicionais, faremos uma alteração que garante
-        // pelo menos a definição de tipo de célula e tentaremos forçar o negrito.
+        // 4. APLICAÇÃO DE ESTILOS AVANÇADOS (Negrito e Centralização)
+        const headerStyle = {
+            font: { bold: true },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
 
-        // A forma mais estável de definir estilos complexos exigiria o uso da biblioteca Pro ou
-        // o uso de um módulo node.js. No navegador, vamos focar na largura e nos cabeçalhos.
-        
-        // Para simplificar e garantir que o negrito funcione na maioria dos casos,
-        // vamos garantir que as células do cabeçalho sejam tratadas como strings:
-        
-        headers.forEach((header, index) => {
-            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index }); // Linha 1 (index 0)
-            
-            // Garante que a célula exista e é uma string
-            if(worksheet[cellAddress]) {
-                worksheet[cellAddress].t = 's'; // Define tipo como string
-                // Nota: Estilos como negrito e alinhamento centralizado exigem o atributo "s" 
-                // (que representa style), mas a versão CDN não o suporta diretamente sem 
-                // o uso de JSON Style Objects mais complexos. 
-                // A largura da coluna e o texto MAIÚSCULO já melhoram muito a visualização.
+        // Percorre as células do cabeçalho (A1 a E1) e anexa o objeto de estilo
+        ['A1', 'B1', 'C1', 'D1', 'E1'].forEach(cellAddress => {
+            if (!worksheet[cellAddress]) {
+                // Cria a célula se ela não existir (geralmente não é o caso aqui)
+                worksheet[cellAddress] = { v: '', t: 's' };
             }
+            
+            // Anexa o objeto de estilo (isso exige suporte interno do XLSX.js)
+            worksheet[cellAddress].s = headerStyle;
         });
 
-        // 7. Cria o livro de trabalho e salva
+
+        // 5. Cria o livro de trabalho e salva
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Passageiros');
 
