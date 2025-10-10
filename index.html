@@ -99,8 +99,17 @@
             <label for="nascimento">Data de Nascimento:</label>
             <input type="date" id="nascimento" required><br>
 
-            <label for="endereco">Endereço:</label>
-            <input type="text" id="endereco" required><br>
+            <label for="rua">Rua:</label>
+            <input type="text" id="rua" required><br>
+
+            <label for="numero">Número:</label>
+            <input type="text" id="numero" required><br>
+
+            <label for="cidade">Cidade:</label>
+            <input type="text" id="cidade" required><br>
+
+            <label for="cep">CEP:</label>
+            <input type="text" id="cep" required><br>
 
             <label for="telefone">Telefone:</label>
             <input type="text" id="telefone" required><br>
@@ -126,8 +135,17 @@
             <label for="edit-nascimento">Data de Nascimento:</label>
             <input type="date" id="edit-nascimento" required><br>
 
-            <label for="edit-endereco">Endereço:</label>
-            <input type="text" id="edit-endereco" required><br>
+            <label for="edit-rua">Rua:</label>
+            <input type="text" id="edit-rua" required><br>
+
+            <label for="edit-numero">Número:</label>
+            <input type="text" id="edit-numero" required><br>
+
+            <label for="edit-cidade">Cidade:</label>
+            <input type="text" id="edit-cidade" required><br>
+
+            <label for="edit-cep">CEP:</label>
+            <input type="text" id="edit-cep" required><br>
 
             <label for="edit-telefone">Telefone:</label>
             <input type="text" id="edit-telefone" required><br>
@@ -333,7 +351,11 @@
         document.getElementById('edit-nome').value = personToEdit.nome;
         document.getElementById('edit-cpf').value = personToEdit.cpf;
         document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
-        document.getElementById('edit-endereco').value = personToEdit.endereco;
+        document.getElementById('edit-rua').value = personToEdit.rua;
+        document.getElementById('edit-numero').value = personToEdit.numero;
+        document.getElementById('edit-cidade').value = personToEdit.cidade;
+        document.getElementById('edit-cep').value = personToEdit.cep;
+        
         document.getElementById('edit-telefone').value = personToEdit.telefone;
 
         // 3. Exibe o modal
@@ -345,15 +367,19 @@
 
     // Envio do Formulário de Edição (Salva no Supabase e atualiza a interface)
     editForm.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
+    e.preventDefault(); 
 
         const id = parseInt(document.getElementById('edit-id').value);
         
+        // ATENÇÃO: Mudamos para os novos 4 campos de endereço
         const updatedData = {
             nome: document.getElementById('edit-nome').value,
             cpf: document.getElementById('edit-cpf').value,
             data_nascimento: document.getElementById('edit-nascimento').value,
-            endereco: document.getElementById('edit-endereco').value,
+            rua: document.getElementById('edit-rua').value,
+            numero: document.getElementById('edit-numero').value,
+            cidade: document.getElementById('edit-cidade').value,
+            cep: document.getElementById('edit-cep').value,
             telefone: document.getElementById('edit-telefone').value,
         };
 
@@ -384,14 +410,18 @@
     });
 
     // Envio do Formulário (Salva no Supabase)
-    form.onsubmit = async function(e) {
+    form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
 
+        // ATENÇÃO: Mudamos para os novos 4 campos de endereço
         const newPersonData = {
             nome: document.getElementById('nome').value,
             cpf: document.getElementById('cpf').value,
-            data_nascimento: document.getElementById('nascimento').value, // Supabase usa 'data_nascimento'
-            endereco: document.getElementById('endereco').value,
+            data_nascimento: document.getElementById('nascimento').value,
+            rua: document.getElementById('rua').value,      // NOVO
+            numero: document.getElementById('numero').value,  // NOVO
+            cidade: document.getElementById('cidade').value,  // NOVO
+            cep: document.getElementById('cep').value,        // NOVO
             telefone: document.getElementById('telefone').value,
         };
         
@@ -434,6 +464,16 @@
             }
             return dateString;
         }
+        function formatAddress(person) {
+            // Evita 'undefined' se o campo estiver vazio
+            const rua = person.rua || '';
+            const numero = person.numero || '';
+            const cidade = person.cidade || '';
+            const cep = person.cep || '';
+            
+            // Aplica o formato: Rua Tal - Número, Cidade - CEP
+            return `${rua} - ${numero}, ${cidade} - ${cep}`;
+        }
 
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
 
@@ -446,7 +486,7 @@
             person.nome, 
             person.cpf, 
             formatDateToBrazilian(person.data_nascimento), 
-            person.endereco, 
+            formatAddress(person), 
             person.telefone,
         ]));
         dataForSheet.unshift(headersXLSX);
@@ -480,7 +520,7 @@
             nome: person.nome,
             cpf: person.cpf,
             data_nascimento: formatDateToBrazilian(person.data_nascimento),
-            endereco: person.endereco,
+            endereco: formatAddress(person),
             telefone: person.telefone
         }));
 
