@@ -77,6 +77,21 @@
         <div id="selectedPassengers">
             <p id="emptyListMsg">Nenhuma pessoa selecionada.</p>
         </div>
+        <hr>
+
+        <div id="roomlist-area" style="margin-top: 30px; padding: 20px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+            <h2>Atribuição de Quartos (Room List)</h2>
+            
+            <div id="roomListAssignmentsDiv">
+                <p>Selecione passageiros na lista acima para começar a atribuir quartos.</p>
+            </div>
+
+            <button id="generateRoomListBtn" style="margin-top: 15px; padding: 10px 20px; font-size: 16px; background-color: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Gerar Room List PDF
+            </button>
+        </div>
+
+        <hr>
     </div>
     
     <hr>
@@ -167,6 +182,15 @@
 
     let database = []; // Banco de dados em memória (cópia do Supabase)
     let selectedPassengers = []; // Lista de passageiros para exportar
+    let roomAssignments = new Map(); // Mapa para guardar a atribuição de quarto: Map<passengerId, roomType>
+
+    const roomTypes = [
+        'Individual', 
+        'Casal', 
+        'Duplo', 
+        'Triplo', 
+        'Quádruplo'
+    ];
 
     const searchInput = document.getElementById('searchInput');
     const searchResultsDiv = document.getElementById('searchResults');
@@ -271,6 +295,58 @@
                 selectedPassengersDiv.appendChild(item);
             });
         }
+        renderRoomList();
+    }
+    function renderRoomList() {
+        const roomListDiv = document.getElementById('roomListAssignmentsDiv');
+        
+        if (selectedPassengers.length === 0) {
+            roomListDiv.innerHTML = '<p>Selecione passageiros na lista acima para começar a atribuir quartos.</p>';
+            return;
+        }
+        
+        let html = '<table><thead><tr><th>Nome</th><th>CPF</th><th>Data Nasc.</th><th>Quarto</th></tr></thead><tbody>';
+        
+        selectedPassengers.forEach(person => {
+            const currentAssignment = roomAssignments.get(person.id) || ''; // Pega o último quarto atribuído
+            
+            // Cria o dropdown com as opções
+            let selectHtml = `<select data-id="${person.id}" class="room-selector">`;
+            selectHtml += '<option value="">-- Selecione o Quarto --</option>';
+            
+            roomTypes.forEach(type => {
+                const selected = currentAssignment === type ? 'selected' : '';
+                selectHtml += `<option value="${type}" ${selected}>${type}</option>`;
+            });
+            selectHtml += '</select>';
+
+            // Insere na tabela
+            html += `
+                <tr id="room-row-${person.id}">
+                    <td>${person.nome}</td>
+                    <td>${person.cpf}</td>
+                    <td>${formatDateToBrazilian(person.data_nascimento)}</td>
+                    <td>${selectHtml}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        roomListDiv.innerHTML = html;
+
+        // Adiciona o Listener para salvar a atribuição sempre que o dropdown muda
+        document.querySelectorAll('.room-selector').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const id = parseInt(e.target.dataset.id);
+                const type = e.target.value;
+                
+                if (type) {
+                    roomAssignments.set(id, type);
+                } else {
+                    roomAssignments.delete(id); // Remove se for a opção "-- Selecione..."
+                }
+            });
+        });
     }
 
     /** Adiciona um passageiro à lista de exportação */
@@ -576,6 +652,76 @@
         });
 
         docSimples.save(`${baseFileName}_ONIBUS.pdf`);
+    });
+    
+    const roomListBtn = document.getElementById('generateRoomListBtn');
+
+    roomListBtn.addEventListener('click', function() {
+        const destinationInput = document.getElementById('tripDestination');
+        const destination = destinationInput.value.trim();
+
+        if (!destination) {
+            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
+            destinationInput.focus();
+            return;
+        }
+
+        if (selectedPassengers.length === 0) {
+            alert('Nenhum passageiro selecionado para gerar a Lista de Quartos.');
+            return;
+        }
+
+        // Verifica se todos os passageiros têm um quarto atribuído
+        const unassignedCount = selectedPassengers.filter(p => !roomAssignments.has(p.id)).length;
+        if (unassignedCount > 0) {
+            if (!confirm(`Atenção: ${unassignedCount} passageiro(s) ainda não tem quarto atribuído. Deseja gerar o PDF assim mesmo?`)) {
+                return;
+            }
+        }
+
+        const { jsPDF } = window.jspdf;
+        
+        // PDF ROOMLIST: Retrato (portrait)
+        const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
+        
+        const headersRoomList = [
+            { header: 'NOME', dataKey: 'nome' },
+            { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
+            { header: 'CPF', dataKey: 'cpf' },
+            { header: 'QUARTO ATRIBUÍDO', dataKey: 'quarto' }
+        ];
+
+        // Converte e formata os dados para o PDF
+        const dataPDFRoomList = selectedPassengers.map(person => ({
+            nome: person.nome,
+            data_nascimento: formatDateToBrazilian(person.data_nascimento),
+            cpf: person.cpf,
+            quarto: roomAssignments.get(person.id) || 'NÃO ATRIBUÍDO'
+        }));
+        
+        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+
+        docRoomList.autoTable({
+            head: [headersRoomList.map(h => h.header)],
+            body: dataPDFRoomList.map(obj => Object.values(obj)),
+            
+            // Estilos
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 }, // Azul mais forte para destaque
+            bodyStyles: { fontSize: 9, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
+            
+            // Largura das Colunas (A4 Retrato)
+            columnStyles: {
+                0: { cellWidth: 50 }, // NOME
+                1: { cellWidth: 35, halign: 'center' }, // DATA DE NASCIMENTO
+                2: { cellWidth: 35, halign: 'center' }, // CPF
+                3: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } // QUARTO (com destaque)
+            },
+            startY: 20,
+            margin: { top: 10, left: 15, right: 15 }
+        });
+
+        docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
+        alert(`Lista de Quartos gerada com sucesso: ${baseFileName}_ROOMLIST.pdf`);
     });
 
     // ----------------------------------------------------
