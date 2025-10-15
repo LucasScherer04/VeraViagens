@@ -813,15 +813,10 @@
         const LOGO_WIDTH = 70; // Largura da logo em mm
         const LOGO_HEIGHT = 20; // Altura da logo em mm
         const PAGE_WIDTH = docRoomList.internal.pageSize.getWidth();
-        
-        // Título do Documento (Canto Esquerdo)
-        docRoomList.setFontSize(14);
-        docRoomList.setFont(undefined, 'bold');
-        docRoomList.text("ROOMLIST COMPLETO - VERA VIAGENS", 15, 30); // Posição: 15mm do topo e 15mm da esquerda
 
-        // Logo (Canto Superior Direito)
-        // Se a imagem não for Base64, ela deve estar acessível via 'logo.png' no projeto.
-        docRoomList.addImage("logo.png", "PNG", PAGE_WIDTH - 15 - LOGO_WIDTH, 5, LOGO_WIDTH, LOGO_HEIGHT); 
+        const CENTER_X = (PAGE_WIDTH / 2) - (LOGO_WIDTH / 2);
+
+        docRoomList.addImage("logo.png", "PNG", CENTER_X, 5, LOGO_WIDTH, LOGO_HEIGHT);
 
         // Define o novo ponto de início Y (Abaixo do cabeçalho)
         let finalY = 40; // 35mm do topo (dá espaço para a logo e o título)
