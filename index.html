@@ -810,8 +810,8 @@
         // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
         // ----------------------------------------------------
         // --- 1. CONFIGURAÇÃO DO CABEÇALHO ---
-        const LOGO_WIDTH = 50; // Largura da logo em mm
-        const LOGO_HEIGHT = 30; // Altura da logo em mm
+        const LOGO_WIDTH = 70; // Largura da logo em mm
+        const LOGO_HEIGHT = 20; // Altura da logo em mm
         const PAGE_WIDTH = docRoomList.internal.pageSize.getWidth();
         
         // Título do Documento (Canto Esquerdo)
@@ -824,7 +824,7 @@
         docRoomList.addImage("logo.png", "PNG", PAGE_WIDTH - 15 - LOGO_WIDTH, 5, LOGO_WIDTH, LOGO_HEIGHT); 
 
         // Define o novo ponto de início Y (Abaixo do cabeçalho)
-        let finalY = 35; // 35mm do topo (dá espaço para a logo e o título)
+        let finalY = 40; // 35mm do topo (dá espaço para a logo e o título)
         let tableIndex = 0;
 
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
