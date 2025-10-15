@@ -757,7 +757,6 @@
     // ----------------------------------------------------
 
     generateRoomListBtn.addEventListener('click', function() {
-        let finalTableData = [];
         const destinationInput = document.getElementById('tripDestination');
         const destination = destinationInput.value.trim();
 
@@ -774,15 +773,9 @@
 
         const { jsPDF } = window.jspdf;
         
-        // PDF ROOMLIST: Formato Retrato
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
-        
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
         
-        // ----------------------------------------------------
-        // 1. AGRUPAMENTO E REFORMATAÇÃO DOS DADOS
-        // ----------------------------------------------------
-
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
         
         const roomsByType = roomAssignments.reduce((acc, room) => {
@@ -793,47 +786,42 @@
 
         let finalY = 15;
         let categoryCounter = 0; 
-        
-        // Dados para o customizador visual (para saber quando desenhar o número grande)
-        let roomVisualData = []; 
 
-        // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF POR CATEGORIA (Com Estilo Desejado)
-        // ----------------------------------------------------
+        // --- Variáveis de Sincronização ---
+        let roomVisualData = []; 
+        let globalRowIndex = 0; // Novo índice global para sincronização
 
         roomTypes.forEach((category) => {
             const rooms = roomsByType[category] || [];
 
             if (rooms.length === 0) return;
 
-            // Se não for a primeira categoria, adiciona um espaço maior
             if (categoryCounter > 0) {
                 finalY += 10; 
             }
 
-            // Verifica se precisa de nova página antes de adicionar o título da categoria
             if (finalY + 20 > docRoomList.internal.pageSize.getHeight()) {
                 docRoomList.addPage();
                 finalY = 15;
             }
-            
-            // --- DESENHA O TÍTULO GRANDE DA CATEGORIA ---
+
+            // --- TÍTULO DA CATEGORIA ---
             docRoomList.setFontSize(18);
             docRoomList.setFont(undefined, 'bold');
             docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
             finalY += 5; 
             
-            // Reinicia a numeração de quartos para esta categoria
+            let finalTableData = []; // Zera a tabela de dados para a nova categoria
             let roomCounter = 1;
-            roomVisualData = []; // Zera a lista de dados visuais
 
+            // Limpa a lista visual para esta nova seção
+            roomVisualData = []; 
+            globalRowIndex = 0;
+            
             // Prepara os dados na estrutura de linhas
             rooms.forEach(room => {
                 room.passengers.forEach((person, paxIndex) => {
                     const isFirstInRoom = paxIndex === 0;
-                    
-                    // Salva o número do quarto apenas na primeira linha para o AutoTable desenhar
-                    const roomDisplay = isFirstInRoom ? roomCounter : '';
                     
                     // Salva o objeto para o hook de desenho (didDrawCell)
                     roomVisualData.push({
@@ -843,15 +831,15 @@
 
                     // Linhas dos Passageiros para a tabela
                     finalTableData.push([
-                        roomDisplay, // QUARTO (será substituído pelo hook)
+                        isFirstInRoom ? roomCounter : '', 
                         person.nome,
                         formatDateToBrazilian(person.data_nascimento),
                         person.cpf
                     ]);
+                    globalRowIndex++;
                 });
                 roomCounter++;
             });
-
 
             // Títulos da Tabela de Dados
             const headersCategory = [
@@ -864,34 +852,35 @@
             // Gera a tabela para a categoria atual
             docRoomList.autoTable({
                 head: [headersCategory],
-                body: finalTableData.map(row => row),
+                body: finalTableData, 
                 startY: finalY + 2, 
                 theme: 'grid', 
-                margin: { left: 15, right: 15 },
+                margin: { left: 10, right: 10 }, // Margens ajustadas
                 styles: { fontSize: 9, cellPadding: 2, textColor: [0, 0, 0] }, 
 
                 headStyles: { 
                     fontStyle: 'bold', 
                     halign: 'center', 
                     valign: 'middle', 
-                    fillColor: [100, 150, 200], // Fundo azul
+                    fillColor: [100, 150, 200], 
                     textColor: 255, 
                 },
                 
+                // CORREÇÃO: Reduzindo larguras para garantir o FIT na página
                 columnStyles: {
-                    0: { cellWidth: 15, halign: 'center' }, // QUARTO (Mais estreito)
+                    0: { cellWidth: 15, halign: 'center' }, // QUARTO
                     1: { cellWidth: 60, halign: 'left' }, // NOME
-                    2: { cellWidth: 35, halign: 'center' }, // DATA NASCIMENTO
-                    3: { cellWidth: 35, halign: 'center' } // CPF
+                    2: { cellWidth: 30, halign: 'center' }, // DATA NASCIMENTO
+                    3: { cellWidth: 30, halign: 'center' } // CPF (Total: 135mm + 20mm Margem = 155mm, que cabe)
                 },
                 
                 // HOOK: Desenha o número do quarto grande e centralizado
                 didDrawCell: (data) => {
-                    // Apenas para a coluna "QUARTO" (index 0) e o corpo
                     if (data.column.index === 0 && data.section === 'body') {
+                        // Usa o índice da linha na TABELA ATUAL (data.row.index) para sincronizar com o visual
                         const rowVisual = roomVisualData[data.row.index];
                         
-                        if (rowVisual.roomNumber) { // Se for a primeira linha do quarto
+                        if (rowVisual && rowVisual.roomNumber) { // Se for a primeira linha do quarto
                             const roomNumber = rowVisual.roomNumber.toString();
                             
                             // Desenha o fundo cinza claro (como na imagem)
@@ -901,7 +890,7 @@
                             // Desenha o número do quarto GRANDE E CENTRALIZADO
                             docRoomList.setFontSize(22);
                             docRoomList.setFont(undefined, 'bold');
-                            docRoomList.setTextColor(0, 0, 0); // Preto
+                            docRoomList.setTextColor(0, 0, 0); 
 
                             docRoomList.text(
                                 roomNumber,
@@ -910,14 +899,12 @@
                                 { align: 'center', baseline: 'middle' }
                             );
                             
-                            // Limpa o estilo padrão
                             docRoomList.setFontSize(9);
                             docRoomList.setFont(undefined, 'normal');
                         }
                     }
                 },
 
-                // Hook para obter a posição final da tabela
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
@@ -926,7 +913,6 @@
             categoryCounter++;
         });
 
-        // Salva o arquivo PDF
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
         alert(`Lista de Quartos gerada com sucesso: ${baseFileName}_ROOMLIST.pdf`);
     });
