@@ -809,6 +809,23 @@
         // ----------------------------------------------------
         // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
         // ----------------------------------------------------
+        // --- 1. CONFIGURAÇÃO DO CABEÇALHO ---
+        const LOGO_WIDTH = 30; // Largura da logo em mm
+        const LOGO_HEIGHT = 15; // Altura da logo em mm
+        const PAGE_WIDTH = docRoomList.internal.pageSize.getWidth();
+        
+        // Título do Documento (Canto Esquerdo)
+        docRoomList.setFontSize(14);
+        docRoomList.setFont(undefined, 'bold');
+        docRoomList.text("RoomList completo - Vera Viagens", 15, 15); // Posição: 15mm do topo e 15mm da esquerda
+
+        // Logo (Canto Superior Direito)
+        // Se a imagem não for Base64, ela deve estar acessível via 'logo.png' no projeto.
+        docRoomList.addImage("logo.png", "PNG", PAGE_WIDTH - 15 - LOGO_WIDTH, 5, LOGO_WIDTH, LOGO_HEIGHT); 
+
+        // Define o novo ponto de início Y (Abaixo do cabeçalho)
+        let finalY = 35; // 35mm do topo (dá espaço para a logo e o título)
+        let tableIndex = 0;
 
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
         
@@ -817,9 +834,6 @@
             acc[room.type].push(room);
             return acc;
         }, {});
-
-        let finalY = 15;
-        let tableIndex = 0; 
 
         // ----------------------------------------------------
         // 2. GERAÇÃO DO PDF COM LINHAS ALTERNADAS POR CAPACIDADE
