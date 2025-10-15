@@ -896,9 +896,9 @@
                 },
                 
                 columnStyles: {
-                    0: { cellWidth: 15, halign: 'center' }, 
-                    1: { cellWidth: 75, halign: 'left' }, 
-                    2: { cellWidth: 30, halign: 'center' }, 
+                    0: { cellWidth: 25, halign: 'center' }, 
+                    1: { cellWidth: 75, halign: 'center' }, 
+                    2: { cellWidth: 50, halign: 'center' }, 
                     3: { cellWidth: 30, halign: 'center' } 
                 },
                 
@@ -906,6 +906,7 @@
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
+                margin: { top: 10, left: 10, right: 10 }
             });
 
             // Atualiza a posição Y global
