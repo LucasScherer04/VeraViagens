@@ -822,7 +822,7 @@
         let tableIndex = 0; 
 
         // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF SEM MESCLAS
+        // 2. GERAÇÃO DO PDF COM LINHAS ALTERNADAS POR CAPACIDADE
         // ----------------------------------------------------
 
         roomTypes.forEach((category) => {
@@ -848,10 +848,13 @@
             
             
             let finalTableData = [];
+            let roomColorData = []; // NOVO: Array para rastrear o estilo por linha
             let roomCounter = 1;
             
             // Prepara os dados na estrutura de linhas
             rooms.forEach(room => {
+                const roomCapacity = roomCapacityMap[room.type] || 1; // Capacidade (N)
+                
                 room.passengers.forEach((person, paxIndex) => {
                     const isFirstInRoom = paxIndex === 0;
                     
@@ -866,6 +869,15 @@
                         person.cpf
                     ];
                     finalTableData.push(row);
+                    
+                    // Salva o metadado da linha para o hook de cor
+                    roomColorData.push({
+                        roomIndex: roomCounter,
+                        capacity: roomCapacity,
+                        // Usaremos o roomCounter para determinar se a cor é ON ou OFF
+                        // roomIndex % 2 !== 0 -> Cor AZUL
+                        // roomIndex % 2 === 0 -> Cor BRANCA
+                    });
                 });
                 roomCounter++;
             });
@@ -905,7 +917,32 @@
                     3: { cellWidth: 30, halign: 'center' } 
                 },
                 
-                // Hook para obter a posição final da tabela
+                // NOVO HOOK: Para calcular e aplicar a cor da linha
+                didParseCell: (data) => {
+                    // Aplica a cor apenas nas linhas de dados (corpo)
+                    if (data.section === 'body') {
+                        const rowStyleData = roomColorData[data.row.index];
+                        
+                        if (rowStyleData) {
+                            const roomIndex = rowStyleData.roomIndex;
+                            
+                            // Alternância simples de cor por índice de quarto: 1=AZUL, 2=BRANCO, 3=AZUL...
+                            if (roomIndex % 2 !== 0) {
+                                data.cell.styles.fillColor = [230, 240, 255]; // Azul Claro Suave
+                            } else {
+                                data.cell.styles.fillColor = [255, 255, 255]; // Branco
+                            }
+                            
+                            // Estilo especial para o número do quarto
+                            if (data.column.index === 0 && data.cell.raw !== '') {
+                                data.cell.styles.fontStyle = 'bold';
+                                data.cell.styles.fontSize = 12;
+                                data.cell.styles.fillColor = [240, 240, 240]; // Fundo Cinza para o número
+                            }
+                        }
+                    }
+                },
+                
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
