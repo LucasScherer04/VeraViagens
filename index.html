@@ -326,6 +326,32 @@
         database.push(newPerson);
         return newPerson;
     }
+    /**
+     * Renumera sequencialmente os quartos dentro de cada categoria (Individual, Casal, etc.)
+     * na estrutura roomAssignments, garantindo que não haja saltos.
+     * Deve ser chamada antes de atualizar a exibição da lista (updateSelectedListDisplay).
+     */
+    function renumberRooms() {
+        const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+        
+        // Filtra e renumera o roomAssignments por tipo
+        roomTypes.forEach(type => {
+            // Encontra todos os quartos do tipo atual
+            const roomsOfType = roomAssignments.filter(room => room.type === type);
+            
+            // Renumera esses quartos sequencialmente (1, 2, 3...)
+            roomsOfType.forEach((room, index) => {
+                // Assume que existe uma propriedade para o número do quarto, se for usada em outro lugar
+                room.room_number = index + 1; 
+            });
+        });
+
+        // Filtra o roomAssignments para remover quaisquer quartos que acabaram vazios
+        // Embora a remoção de passageiros deva ser inteligente, isso garante a limpeza.
+        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
+
+        console.log("Quartos Renumerados:", roomAssignments);
+    }
 
 
     // ----------------------------------------------------
@@ -371,6 +397,7 @@
     window.removeRoom = function(roomId) {
         if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
             roomAssignments = roomAssignments.filter(room => room.id !== roomId);
+            renumberRooms();
             renderAssignedRoomsDisplay();
             updateSelectedListDisplay();
         }
@@ -781,6 +808,7 @@
         // ----------------------------------------------------
 
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+        
         const roomsByType = roomAssignments.reduce((acc, room) => {
             acc[room.type] = acc[room.type] || [];
             acc[room.type].push(room);
@@ -788,11 +816,10 @@
         }, {});
 
         let finalY = 15;
-        let categoryCounter = 0; 
-        let tableIndex = 0; // Para garantir que o startY seja correto
+        let tableIndex = 0; 
 
         // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF POR CATEGORIA (Corrigida)
+        // 2. GERAÇÃO DO PDF SEM MESCLAS
         // ----------------------------------------------------
 
         roomTypes.forEach((category) => {
@@ -800,49 +827,37 @@
 
             if (rooms.length === 0) return;
 
-            // Se não for a primeira tabela, garante espaçamento
             if (tableIndex > 0) {
                 finalY += 10; 
             }
 
-            // Se o espaço for insuficiente, adiciona uma nova página
             if (finalY + 20 > docRoomList.internal.pageSize.getHeight()) {
                 docRoomList.addPage();
                 finalY = 15;
             }
 
-            // --- DESENHA O TÍTULO GRANDE DA CATEGORIA (FORA DA TABELA) ---
+            // --- DESENHA O TÍTULO DA CATEGORIA (FORA DA TABELA) ---
             docRoomList.setFontSize(18);
             docRoomList.setFont(undefined, 'bold');
-            docRoomList.setTextColor(0, 0, 0); // Texto Preto
+            docRoomList.setTextColor(0, 0, 0); 
             docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
-            finalY += 5; // Avança o cursor Y
-
+            finalY += 5; 
+            
             
             let finalTableData = [];
             let roomCounter = 1;
             
             // Prepara os dados na estrutura de linhas
             rooms.forEach(room => {
-                // 1. Define a célula mesclada para o número do quarto
-                const roomNumberCell = {
-                    rowSpan: room.passengers.length, 
-                    content: roomCounter.toString(),
-                    styles: { 
-                        fontStyle: 'bold', 
-                        fontSize: 22, // Número GRANDE
-                        halign: 'center', 
-                        valign: 'middle', 
-                        fillColor: [240, 240, 240] 
-                    }
-                };
-                
-                // 2. Adiciona as linhas dos passageiros
                 room.passengers.forEach((person, paxIndex) => {
+                    const isFirstInRoom = paxIndex === 0;
+                    
+                    // O número do quarto só aparece na primeira linha do grupo
+                    const roomDisplay = isFirstInRoom ? roomCounter.toString() : '';
+                    
+                    // Linhas dos Passageiros para a tabela
                     const row = [
-                        // Coluna 1 (QUARTO): Apenas na primeira linha (paxIndex === 0)
-                        paxIndex === 0 ? roomNumberCell : '', 
-                        // Colunas 2, 3, 4
+                        roomDisplay, // QUARTO
                         person.nome,
                         formatDateToBrazilian(person.data_nascimento),
                         person.cpf
@@ -855,7 +870,6 @@
 
             // --- ESTRUTURA DE CABEÇALHO (APENAS 1 LINHA) ---
             const headersCategory = [
-                // Linha única com os títulos de coluna
                 ['QUARTO', 'NOME', 'DATA DE NASCIMENTO', 'CPF']
             ];
 
@@ -864,7 +878,7 @@
             docRoomList.autoTable({
                 head: headersCategory,
                 body: finalTableData, 
-                startY: finalY + 2, // Inicia a tabela logo abaixo do título
+                startY: finalY + 2, 
                 theme: 'grid', 
                 margin: { left: 10, right: 10 }, 
                 styles: { 
@@ -877,15 +891,15 @@
                     fontStyle: 'bold', 
                     halign: 'center', 
                     valign: 'middle', 
-                    fillColor: [60, 130, 200], // Azul mais escuro
-                    textColor: 255, // Texto branco
+                    fillColor: [60, 130, 200], 
+                    textColor: 255, 
                 },
                 
                 columnStyles: {
-                    0: { cellWidth: 15, halign: 'center' }, // QUARTO
-                    1: { cellWidth: 75, halign: 'left' }, // NOME
-                    2: { cellWidth: 30, halign: 'center' }, // DATA NASCIMENTO
-                    3: { cellWidth: 30, halign: 'center' } // CPF
+                    0: { cellWidth: 15, halign: 'center' }, 
+                    1: { cellWidth: 75, halign: 'left' }, 
+                    2: { cellWidth: 30, halign: 'center' }, 
+                    3: { cellWidth: 30, halign: 'center' } 
                 },
                 
                 // Hook para obter a posição final da tabela
@@ -894,12 +908,11 @@
                 }
             });
 
-            // Atualiza a posição Y global (fundamental para a próxima tabela)
+            // Atualiza a posição Y global
             const table = docRoomList.autoTable.previous;
             finalY = table.finalY;
             
-            categoryCounter++;
-            tableIndex++; // Incrementa o índice da tabela para controle de espaçamento
+            tableIndex++; 
         });
 
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
