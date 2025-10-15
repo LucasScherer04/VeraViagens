@@ -364,7 +364,7 @@
     }
 
     function renderAssignedRoomsDisplay() {
-        const displayDiv = assignedRoomsDisplay;
+        const displayDiv = assignedRoomsDisplay; // Usando a variável DOM
         
         if (roomAssignments.length === 0) {
             displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
@@ -375,12 +375,14 @@
         html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
         html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
         
-        roomAssignments.forEach(room => {
+        // CORREÇÃO: Usamos 'index + 1' para o número sequencial de exibição
+        roomAssignments.forEach((room, index) => {
+            const sequentialNumber = index + 1;
             const passengerNames = room.passengers.map(p => p.nome).join(', ');
             
             html += `
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="font-weight: bold;">${room.id}</td>
+                    <td style="font-weight: bold;">${sequentialNumber}</td>
                     <td>${room.type}</td>
                     <td>${passengerNames}</td>
                     <td>
@@ -395,13 +397,14 @@
     }
 
     window.removeRoom = function(roomId) {
-        if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
-            roomAssignments = roomAssignments.filter(room => room.id !== roomId);
-            renumberRooms();
-            renderAssignedRoomsDisplay();
-            updateSelectedListDisplay();
-        }
-    };
+    if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
+        // Remove o quarto do array (usando o ID único para identificação)
+        roomAssignments = roomAssignments.filter(room => room.id !== roomId);
+        
+        renderAssignedRoomsDisplay(); 
+        updateSelectedListDisplay(); // Atualiza a lista principal (para liberar passageiros)
+    }
+};
 
     function openAddRoomModal() {
         addRoomForm.reset();
