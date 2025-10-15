@@ -779,68 +779,74 @@
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
         
         // ----------------------------------------------------
-        // 1. AGRUPAMENTO E REFORMATAÇÃO DOS DADOS
+        // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
         // ----------------------------------------------------
 
-        // Agrupa os quartos por tipo (ex: {Casal: [room1, room5], Duplo: [room2]})
+        const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+        
         const roomsByType = roomAssignments.reduce((acc, room) => {
             acc[room.type] = acc[room.type] || [];
             acc[room.type].push(room);
             return acc;
         }, {});
 
-        let finalY = 15; // Posição inicial Y para a primeira tabela
-        let pageNumber = 1;
+        let finalY = 15;
+        let categoryCounter = 0; // Para controlar o espaçamento entre categorias
 
         // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF POR CATEGORIA
+        // 2. GERAÇÃO DO PDF POR CATEGORIA (Novo Design)
         // ----------------------------------------------------
 
-        // Loop pela ordem desejada dos tipos de quarto
         roomTypes.forEach((category) => {
             const rooms = roomsByType[category] || [];
 
-            if (rooms.length === 0) return; // Pula categorias vazias
+            if (rooms.length === 0) return;
 
-            // Título da Categoria
-            docRoomList.setFontSize(14);
-            docRoomList.setTextColor(0, 0, 0); // Texto Preto
-            
-            // Verifica se precisa de nova página antes de adicionar o título da categoria
+            // Se não for a primeira categoria, adiciona um espaço maior
+            if (categoryCounter > 0) {
+                finalY += 10; 
+            }
+
+            // Verifica se precisa de nova página
             if (finalY + 15 > docRoomList.internal.pageSize.getHeight()) {
                 docRoomList.addPage();
                 finalY = 15;
-                pageNumber++;
             }
-            
-            docRoomList.text(`CATEGORIA: ${category.toUpperCase()} (${rooms.length} Quarto(s))`, 15, finalY);
-            finalY += 5; // Espaço após o título
 
-            // Prepara os dados para a tabela desta categoria
+            // Prepara os dados agrupados (Incluindo a linha de título da categoria)
             let categoryTableData = [];
             let roomCounter = 1;
 
+            // Adiciona a Linha Título da Categoria
+            categoryTableData.push({
+                // Usa 'raw' para que o hook 'willDrawCell' possa identificá-la
+                content: `CATEGORIA: ${category.toUpperCase()}`,
+                isCategoryTitle: true 
+            });
+
+
             rooms.forEach(room => {
-                // Linha de Título do Quarto (Negrito)
-                categoryTableData.push([
-                    { content: `Quarto ${roomCounter++} - (${room.type})`, styles: { fontStyle: 'bold', fillColor: [220, 220, 220], textColor: [0, 0, 0] } },
-                    { content: '', styles: { fillColor: [220, 220, 220] } },
-                    { content: '', styles: { fillColor: [220, 220, 220] } },
-                    { content: '', styles: { fillColor: [220, 220, 220] } }
-                ]);
+                // Linha de Título do Quarto
+                categoryTableData.push({
+                    content: `QUARTO ${roomCounter++} - (${room.type})`,
+                    isRoomTitle: true 
+                });
 
                 // Linhas dos Passageiros
                 room.passengers.forEach(person => {
-                    categoryTableData.push([
-                        { content: '' }, // Coluna Quarto (em branco)
-                        person.nome,
-                        formatDateToBrazilian(person.data_nascimento),
-                        person.cpf
-                    ]);
+                    categoryTableData.push({
+                        content: [
+                            '', // Coluna QUARTO (Vazia)
+                            person.nome,
+                            formatDateToBrazilian(person.data_nascimento),
+                            person.cpf
+                        ],
+                        isPassenger: true // Identificador de linha de passageiro
+                    });
                 });
             });
 
-            // Títulos da Tabela (Corrigidos para refletir as 4 colunas)
+            // Títulos da Tabela de Dados
             const headersCategory = [
                 'QUARTO', 
                 'NOME', 
@@ -851,34 +857,54 @@
             // Gera a tabela para a categoria atual
             docRoomList.autoTable({
                 head: [headersCategory],
-                body: categoryTableData,
-                startY: finalY + 2, // Inicia abaixo do título da categoria
-                theme: 'grid', // Tema 'grid' para as bordas marcadas
+                body: categoryTableData.map(row => row.isCategoryTitle || row.isRoomTitle ? [row.content, '', '', ''] : row.content), // Mapeia para 4 colunas
+                startY: finalY + 2, 
+                theme: 'grid', 
                 margin: { left: 15, right: 15 },
-                styles: { fontSize: 9, cellPadding: 2, textColor: [0, 0, 0] }, // CORREÇÃO: Todo texto do corpo é preto
+                styles: { fontSize: 9, cellPadding: 2, textColor: [0, 0, 0] }, 
 
                 headStyles: { 
                     fontStyle: 'bold', 
                     halign: 'center', 
                     valign: 'middle', 
-                    fillColor: [100, 150, 200], // Fundo azul
-                    textColor: 255, // Texto branco para título
+                    fillColor: [54, 137, 219], // Azul mais escuro
+                    textColor: 255, 
                 },
                 
                 columnStyles: {
-                    0: { cellWidth: 35, halign: 'left' }, // QUARTO
-                    1: { cellWidth: 60, halign: 'left' }, // NOME
-                    2: { cellWidth: 30, halign: 'center' }, // DATA NASCIMENTO
-                    3: { cellWidth: 35, halign: 'center' } // CPF
+                    0: { cellWidth: 35, halign: 'center' }, // QUARTO (Onde vai a linha de título)
+                    1: { cellWidth: 60, halign: 'left' }, 
+                    2: { cellWidth: 30, halign: 'center' }, 
+                    3: { cellWidth: 35, halign: 'center' } 
                 },
                 
+                // HOOK: Para estilizar as linhas de Título e Categoria
+                willDrawCell: (data) => {
+                    const rowData = categoryTableData[data.row.index];
+                    
+                    if (rowData && rowData.isCategoryTitle) {
+                        // Estilo para o Título da Categoria (Linha que se expande)
+                        data.cell.colSpan = 4; // Faz o título da categoria ocupar toda a largura
+                        data.cell.styles.fillColor = [220, 220, 220]; 
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.halign = 'center';
+                        data.cell.styles.fontSize = 11;
+                    } else if (rowData && rowData.isRoomTitle) {
+                        // Estilo para o Título do Quarto (Linha que se expande)
+                        data.cell.colSpan = 4; // Faz o título do quarto ocupar toda a largura
+                        data.cell.styles.fillColor = [240, 240, 240]; 
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.halign = 'left';
+                    }
+                },
+
                 // Hook para obter a posição final da tabela
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
             });
 
-            finalY += 10; // Espaço entre as categorias
+            categoryCounter++;
         });
 
         // Salva o arquivo PDF
