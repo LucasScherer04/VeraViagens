@@ -779,7 +779,7 @@
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
         
         // ----------------------------------------------------
-        // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
+        // 1. AGRUPAMENTO E REFORMATAÇÃO DOS DADOS
         // ----------------------------------------------------
 
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
@@ -791,10 +791,13 @@
         }, {});
 
         let finalY = 15;
-        let categoryCounter = 0; // Para controlar o espaçamento entre categorias
+        let categoryCounter = 0; 
+        
+        // Dados para o customizador visual (para saber quando desenhar o número grande)
+        let roomVisualData = []; 
 
         // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF POR CATEGORIA (Novo Design)
+        // 2. GERAÇÃO DO PDF POR CATEGORIA (Com Estilo Desejado)
         // ----------------------------------------------------
 
         roomTypes.forEach((category) => {
@@ -807,44 +810,47 @@
                 finalY += 10; 
             }
 
-            // Verifica se precisa de nova página
-            if (finalY + 15 > docRoomList.internal.pageSize.getHeight()) {
+            // Verifica se precisa de nova página antes de adicionar o título da categoria
+            if (finalY + 20 > docRoomList.internal.pageSize.getHeight()) {
                 docRoomList.addPage();
                 finalY = 15;
             }
-
-            // Prepara os dados agrupados (Incluindo a linha de título da categoria)
-            let categoryTableData = [];
+            
+            // --- DESENHA O TÍTULO GRANDE DA CATEGORIA ---
+            docRoomList.setFontSize(18);
+            docRoomList.setFont(undefined, 'bold');
+            docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
+            finalY += 5; 
+            
+            // Reinicia a numeração de quartos para esta categoria
             let roomCounter = 1;
+            roomVisualData = []; // Zera a lista de dados visuais
 
-            // Adiciona a Linha Título da Categoria
-            categoryTableData.push({
-                // Usa 'raw' para que o hook 'willDrawCell' possa identificá-la
-                content: `CATEGORIA: ${category.toUpperCase()}`,
-                isCategoryTitle: true 
-            });
-
-
+            // Prepara os dados na estrutura de linhas
             rooms.forEach(room => {
-                // Linha de Título do Quarto
-                categoryTableData.push({
-                    content: `QUARTO ${roomCounter++} - (${room.type})`,
-                    isRoomTitle: true 
-                });
-
-                // Linhas dos Passageiros
-                room.passengers.forEach(person => {
-                    categoryTableData.push({
-                        content: [
-                            '', // Coluna QUARTO (Vazia)
-                            person.nome,
-                            formatDateToBrazilian(person.data_nascimento),
-                            person.cpf
-                        ],
-                        isPassenger: true // Identificador de linha de passageiro
+                room.passengers.forEach((person, paxIndex) => {
+                    const isFirstInRoom = paxIndex === 0;
+                    
+                    // Salva o número do quarto apenas na primeira linha para o AutoTable desenhar
+                    const roomDisplay = isFirstInRoom ? roomCounter : '';
+                    
+                    // Salva o objeto para o hook de desenho (didDrawCell)
+                    roomVisualData.push({
+                        roomNumber: isFirstInRoom ? roomCounter : '',
+                        passengerCount: room.passengers.length
                     });
+
+                    // Linhas dos Passageiros para a tabela
+                    finalTableData.push([
+                        roomDisplay, // QUARTO (será substituído pelo hook)
+                        person.nome,
+                        formatDateToBrazilian(person.data_nascimento),
+                        person.cpf
+                    ]);
                 });
+                roomCounter++;
             });
+
 
             // Títulos da Tabela de Dados
             const headersCategory = [
@@ -857,7 +863,7 @@
             // Gera a tabela para a categoria atual
             docRoomList.autoTable({
                 head: [headersCategory],
-                body: categoryTableData.map(row => row.isCategoryTitle || row.isRoomTitle ? [row.content, '', '', ''] : row.content), // Mapeia para 4 colunas
+                body: finalTableData.map(row => row),
                 startY: finalY + 2, 
                 theme: 'grid', 
                 margin: { left: 15, right: 15 },
@@ -867,34 +873,46 @@
                     fontStyle: 'bold', 
                     halign: 'center', 
                     valign: 'middle', 
-                    fillColor: [54, 137, 219], // Azul mais escuro
+                    fillColor: [100, 150, 200], // Fundo azul
                     textColor: 255, 
                 },
                 
                 columnStyles: {
-                    0: { cellWidth: 35, halign: 'center' }, // QUARTO (Onde vai a linha de título)
-                    1: { cellWidth: 60, halign: 'left' }, 
-                    2: { cellWidth: 30, halign: 'center' }, 
-                    3: { cellWidth: 35, halign: 'center' } 
+                    0: { cellWidth: 15, halign: 'center' }, // QUARTO (Mais estreito)
+                    1: { cellWidth: 60, halign: 'left' }, // NOME
+                    2: { cellWidth: 35, halign: 'center' }, // DATA NASCIMENTO
+                    3: { cellWidth: 35, halign: 'center' } // CPF
                 },
                 
-                // HOOK: Para estilizar as linhas de Título e Categoria
-                willDrawCell: (data) => {
-                    const rowData = categoryTableData[data.row.index];
-                    
-                    if (rowData && rowData.isCategoryTitle) {
-                        // Estilo para o Título da Categoria (Linha que se expande)
-                        data.cell.colSpan = 4; // Faz o título da categoria ocupar toda a largura
-                        data.cell.styles.fillColor = [220, 220, 220]; 
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.halign = 'center';
-                        data.cell.styles.fontSize = 11;
-                    } else if (rowData && rowData.isRoomTitle) {
-                        // Estilo para o Título do Quarto (Linha que se expande)
-                        data.cell.colSpan = 4; // Faz o título do quarto ocupar toda a largura
-                        data.cell.styles.fillColor = [240, 240, 240]; 
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.halign = 'left';
+                // HOOK: Desenha o número do quarto grande e centralizado
+                didDrawCell: (data) => {
+                    // Apenas para a coluna "QUARTO" (index 0) e o corpo
+                    if (data.column.index === 0 && data.section === 'body') {
+                        const rowVisual = roomVisualData[data.row.index];
+                        
+                        if (rowVisual.roomNumber) { // Se for a primeira linha do quarto
+                            const roomNumber = rowVisual.roomNumber.toString();
+                            
+                            // Desenha o fundo cinza claro (como na imagem)
+                            docRoomList.setFillColor(240, 240, 240); 
+                            docRoomList.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height * rowVisual.passengerCount, 'F');
+                            
+                            // Desenha o número do quarto GRANDE E CENTRALIZADO
+                            docRoomList.setFontSize(22);
+                            docRoomList.setFont(undefined, 'bold');
+                            docRoomList.setTextColor(0, 0, 0); // Preto
+
+                            docRoomList.text(
+                                roomNumber,
+                                data.cell.x + data.cell.width / 2, // Centro X
+                                data.cell.y + (data.cell.height * rowVisual.passengerCount) / 2 + 3, // Centro Y
+                                { align: 'center', baseline: 'middle' }
+                            );
+                            
+                            // Limpa o estilo padrão
+                            docRoomList.setFontSize(9);
+                            docRoomList.setFont(undefined, 'normal');
+                        }
                     }
                 },
 
