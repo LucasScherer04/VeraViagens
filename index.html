@@ -251,6 +251,8 @@
     const generateRoomListBtn = document.getElementById('generateRoomListBtn');
     const assignedRoomsDisplay = document.getElementById('assignedRoomsDisplay'); 
 
+    const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+
 
     // ----------------------------------------------------
     // FUNÇÕES AUXILIARES DE FORMATAÇÃO (Tudo aqui para evitar ReferenceError)
@@ -295,7 +297,6 @@
     }
     
     async function loadAllPassengers() {
-        loadingMsg.textContent = 'Carregando dados...';
         const { data, error } = await supabaseClient
             .from('passageiros')
             .select('*');
@@ -771,69 +772,116 @@
         }
 
         const { jsPDF } = window.jspdf;
+        
+        // PDF ROOMLIST: Formato Retrato
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
         
-        const headersRoomList = [
-            { header: 'QUARTO', dataKey: 'quarto' },
-            { header: 'NOME', dataKey: 'nome' },
-            { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
-            { header: 'CPF', dataKey: 'cpf' }
-        ];
+        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+        
+        // ----------------------------------------------------
+        // 1. AGRUPAMENTO E REFORMATAÇÃO DOS DADOS
+        // ----------------------------------------------------
 
-        let finalTableData = [];
+        // Agrupa os quartos por tipo (ex: {Casal: [room1, room5], Duplo: [room2]})
+        const roomsByType = roomAssignments.reduce((acc, room) => {
+            acc[room.type] = acc[room.type] || [];
+            acc[room.type].push(room);
+            return acc;
+        }, {});
 
-        // Prepara os dados, agrupando por quarto e adicionando a linha do título do quarto
-        roomAssignments.forEach(room => {
-            // Linha de Cabeçalho do Quarto
-            finalTableData.push({
-                quarto: `QUARTO ${room.id} (${room.type.toUpperCase()})`,
-                nome: '',
-                data_nascimento: '',
-                cpf: ''
-            });
+        let finalY = 15; // Posição inicial Y para a primeira tabela
+        let pageNumber = 1;
+
+        // ----------------------------------------------------
+        // 2. GERAÇÃO DO PDF POR CATEGORIA
+        // ----------------------------------------------------
+
+        // Loop pela ordem desejada dos tipos de quarto
+        roomTypes.forEach((category) => {
+            const rooms = roomsByType[category] || [];
+
+            if (rooms.length === 0) return; // Pula categorias vazias
+
+            // Título da Categoria
+            docRoomList.setFontSize(14);
+            docRoomList.setTextColor(0, 0, 0); // Texto Preto
             
-            // Linhas dos Passageiros
-            room.passengers.forEach(person => {
-                finalTableData.push({
-                    quarto: '',
-                    nome: person.nome,
-                    data_nascimento: formatDateToBrazilian(person.data_nascimento),
-                    cpf: person.cpf
+            // Verifica se precisa de nova página antes de adicionar o título da categoria
+            if (finalY + 15 > docRoomList.internal.pageSize.getHeight()) {
+                docRoomList.addPage();
+                finalY = 15;
+                pageNumber++;
+            }
+            
+            docRoomList.text(`CATEGORIA: ${category.toUpperCase()} (${rooms.length} Quarto(s))`, 15, finalY);
+            finalY += 5; // Espaço após o título
+
+            // Prepara os dados para a tabela desta categoria
+            let categoryTableData = [];
+            let roomCounter = 1;
+
+            rooms.forEach(room => {
+                // Linha de Título do Quarto (Negrito)
+                categoryTableData.push([
+                    { content: `Quarto ${roomCounter++} - (${room.type})`, styles: { fontStyle: 'bold', fillColor: [220, 220, 220], textColor: [0, 0, 0] } },
+                    { content: '', styles: { fillColor: [220, 220, 220] } },
+                    { content: '', styles: { fillColor: [220, 220, 220] } },
+                    { content: '', styles: { fillColor: [220, 220, 220] } }
+                ]);
+
+                // Linhas dos Passageiros
+                room.passengers.forEach(person => {
+                    categoryTableData.push([
+                        { content: '' }, // Coluna Quarto (em branco)
+                        person.nome,
+                        formatDateToBrazilian(person.data_nascimento),
+                        person.cpf
+                    ]);
                 });
             });
-        });
 
-        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+            // Títulos da Tabela (Corrigidos para refletir as 4 colunas)
+            const headersCategory = [
+                'QUARTO', 
+                'NOME', 
+                'DATA DE NASCIMENTO', 
+                'CPF'
+            ];
 
-        docRoomList.autoTable({
-            head: [headersRoomList.map(h => h.header)],
-            body: finalTableData.map(obj => Object.values(obj)),
-            
-            // Estilos
-            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 }, 
-            bodyStyles: { fontSize: 9, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
-            
-            // Estilos de Linha (Título do Quarto)
-            didParseCell: (data) => {
-                const rowData = finalTableData[data.row.index];
-                if (rowData && rowData.quarto.startsWith('QUARTO ')) {
-                    data.cell.styles.fontStyle = 'bold';
-                    data.cell.styles.fillColor = [220, 220, 220]; 
-                    data.cell.styles.halign = 'left';
+            // Gera a tabela para a categoria atual
+            docRoomList.autoTable({
+                head: [headersCategory],
+                body: categoryTableData,
+                startY: finalY + 2, // Inicia abaixo do título da categoria
+                theme: 'grid', // Tema 'grid' para as bordas marcadas
+                margin: { left: 15, right: 15 },
+                styles: { fontSize: 9, cellPadding: 2, textColor: [0, 0, 0] }, // CORREÇÃO: Todo texto do corpo é preto
+
+                headStyles: { 
+                    fontStyle: 'bold', 
+                    halign: 'center', 
+                    valign: 'middle', 
+                    fillColor: [100, 150, 200], // Fundo azul
+                    textColor: 255, // Texto branco para título
+                },
+                
+                columnStyles: {
+                    0: { cellWidth: 35, halign: 'left' }, // QUARTO
+                    1: { cellWidth: 60, halign: 'left' }, // NOME
+                    2: { cellWidth: 30, halign: 'center' }, // DATA NASCIMENTO
+                    3: { cellWidth: 35, halign: 'center' } // CPF
+                },
+                
+                // Hook para obter a posição final da tabela
+                didDrawPage: (data) => {
+                    finalY = data.cursor.y;
                 }
-            },
-            
-            // Largura das Colunas
-            columnStyles: {
-                0: { cellWidth: 40, halign: 'left' }, 
-                1: { cellWidth: 60, halign: 'left' }, 
-                2: { cellWidth: 30, halign: 'center' }, 
-                3: { cellWidth: 35, halign: 'center' } 
-            },
-            startY: 20,
-            margin: { top: 10, left: 10, right: 10 }
+            });
+
+            finalY += 10; // Espaço entre as categorias
         });
 
+        // Salva o arquivo PDF
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
         alert(`Lista de Quartos gerada com sucesso: ${baseFileName}_ROOMLIST.pdf`);
     });
