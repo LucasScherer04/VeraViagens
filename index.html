@@ -928,14 +928,14 @@
                             
                             // Alternância simples de cor por índice de quarto: 1=AZUL, 2=BRANCO, 3=AZUL...
                             if (roomIndex % 2 !== 0) {
-                                data.cell.styles.fillColor = [240, 245, 255]; // Azul Claro Suave
+                                data.cell.styles.fillColor = [255, 255, 255]; // Branco
                                 // Estilo especial para o número do quarto
                                 if (data.column.index === 0) {
                                     data.cell.styles.fontStyle = 'bold';
                                     data.cell.styles.fontSize = 12;
                                 }
                             } else {
-                                data.cell.styles.fillColor = [255, 255, 255]; // Branco
+                                data.cell.styles.fillColor = [240, 245, 255]; // Azul Claro Suave
                                 if (data.column.index === 0) {
                                     data.cell.styles.fontStyle = 'bold';
                                     data.cell.styles.fontSize = 12;
