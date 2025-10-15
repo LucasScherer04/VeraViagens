@@ -654,7 +654,7 @@
         // ----------------------------------------------------
         // 1. GERAÇÃO DA LISTA COMPLETA (XLSX)
         // ----------------------------------------------------
-        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO COMPLETO', 'TELEFONE' ];
+        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
         
         const dataForSheet = selectedPassengers.map(person => ([
             person.nome, 
@@ -684,7 +684,7 @@
             { header: 'NOME', dataKey: 'nome' },
             { header: 'CPF', dataKey: 'cpf' },
             { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
-            { header: 'ENDEREÇO COMPLETO', dataKey: 'endereco_completo' },
+            { header: 'ENDEREÇO', dataKey: 'endereco_completo' },
             { header: 'TELEFONE', dataKey: 'telefone' }
         ];
 
@@ -705,7 +705,7 @@
                 0: { cellWidth: 45 }, 
                 1: { cellWidth: 30, halign: 'center' }, 
                 2: { cellWidth: 35, halign: 'center' }, 
-                3: { cellWidth: 100, halign: 'center' }, 
+                3: { cellWidth: 140, halign: 'center' }, 
                 4: { cellWidth: 30, halign: 'center' }
             },
             startY: 20,
