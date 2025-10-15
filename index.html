@@ -537,6 +537,7 @@
             form.reset();
             modal.style.display = 'none';
         }
+        modal.style.display = 'block';
     });
 
     // Modal Editar Pessoa
@@ -579,6 +580,7 @@
             const selIndex = selectedPassengers.findIndex(p => p.id === id);
             if (selIndex !== -1) { selectedPassengers[selIndex] = savedPerson; }
             updateSelectedListDisplay();
+            editModal.style.display = 'none';
         }
     });
 
@@ -622,6 +624,7 @@
             passengers: selectedPassengersData
         });
 
+        addRoomModal.style.display = 'none';
         renderAssignedRoomsDisplay();
         updateSelectedListDisplay(); 
     });
