@@ -476,7 +476,7 @@
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; 
 
-        if (searchTerm.length < 2) {
+        if (searchTerm.length < 1) {
             searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
             return;
         }
@@ -579,7 +579,6 @@
             const selIndex = selectedPassengers.findIndex(p => p.id === id);
             if (selIndex !== -1) { selectedPassengers[selIndex] = savedPerson; }
             updateSelectedListDisplay();
-            editModal.style.display = 'none';
         }
     });
 
@@ -623,7 +622,6 @@
             passengers: selectedPassengersData
         });
 
-        addRoomModal.style.display = 'none';
         renderAssignedRoomsDisplay();
         updateSelectedListDisplay(); 
     });
