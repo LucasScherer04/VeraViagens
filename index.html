@@ -401,7 +401,7 @@
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; 
 
-        if (searchTerm.length < 2) {
+        if (searchTerm.length < 1) {
             searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
             return;
         }
