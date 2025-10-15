@@ -213,29 +213,11 @@
     
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let database = []; // Banco de dados em memória (cópia do Supabase)
-    let selectedPassengers = []; // Lista de passageiros para exportar
-    let roomAssignments = []; // Array de objetos: [{ type: 'Casal', passengers: [p1, p2] }, ...]
-    let nextRoomNumber = 1; // Contador para numerar os quartos no PDF
-
-    const searchInput = document.getElementById('searchInput');
-    const searchResultsDiv = document.getElementById('searchResults');
-    const selectedPassengersDiv = document.getElementById('selectedPassengers');
-    const emptyListMsg = document.getElementById('emptyListMsg');
-    const finishListBtn = document.getElementById('finishListBtn');
-    const loadingMsg = document.getElementById('loadingMsg');
-    
-    const modal = document.getElementById('addPersonModal');
-    const form = document.getElementById('addPersonForm');
-
-    // --- NOVAS REFERÊNCIAS ---
-    const addRoomBtn = document.getElementById('addRoomBtn');
-    const addRoomModal = document.getElementById('addRoomModal');
-    const closeRoomBtn = document.getElementsByClassName('close-room-btn')[0];
-    const roomTypeSelect = document.getElementById('roomType');
-    const roomPaxCountInput = document.getElementById('roomPaxCount');
-    const availablePassengersList = document.getElementById('availablePassengersList');
-    const addRoomForm = document.getElementById('addRoomForm');
+    // --- VARIÁVEIS GLOBAIS E ESTRUTURAS DE DADOS ---
+    let database = []; // Cópia de todos os passageiros
+    let selectedPassengers = []; // Passageiros na lista atual (para exportar)
+    let roomAssignments = []; // NOVO: Array de objetos de quartos atribuídos
+    let nextRoomNumber = 1; // Contador para ID do quarto
 
     const roomCapacityMap = {
         'Individual': 1,
@@ -245,98 +227,55 @@
         'Quadruplo': 4
     };
 
-    // --- ABRIR MODAL ---
-    addRoomBtn.addEventListener('click', () => {
-        openAddRoomModal();
-    });
-
-    closeRoomBtn.addEventListener('click', () => {
-        addRoomModal.style.display = 'none';
-    });
-    // Listener para Tipo de Quarto (Atualiza a contagem)
-roomTypeSelect.addEventListener('change', (e) => {
-    const type = e.target.value;
-    const capacity = roomCapacityMap[type] || 0;
+    // --- REFERÊNCIAS DOM ---
+    const searchInput = document.getElementById('searchInput');
+    const searchResultsDiv = document.getElementById('searchResults');
+    const selectedPassengersDiv = document.getElementById('selectedPassengers');
+    const emptyListMsg = document.getElementById('emptyListMsg');
+    const finishListBtn = document.getElementById('finishListBtn');
+    const loadingMsg = document.getElementById('loadingMsg');
     
-    roomPaxCountInput.value = capacity;
-    roomPaxCountInput.disabled = true; // Mantém desabilitado para garantir o controle
-});
+    // Modais e Formulários de Pessoa
+    const modal = document.getElementById('addPersonModal');
+    const form = document.getElementById('addPersonForm');
+    const closeBtn = document.getElementsByClassName('close-btn')[0];
+    const editModal = document.getElementById('editPersonModal');
+    const editForm = document.getElementById('editPersonForm');
+    const closeEditBtn = document.getElementsByClassName('close-edit-btn')[0];
 
-    // Envio do Formulário do Quarto
-    addRoomForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        const type = roomTypeSelect.value;
-        const requiredPax = parseInt(roomPaxCountInput.value);
-        
-        // Pega todos os checkboxes marcados
-        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
-        const selectedPassengersData = checkedBoxes.map(box => 
-            selectedPassengers.find(p => p.id === parseInt(box.value))
-        );
-        
-        if (selectedPassengersData.length === 0) {
-            alert('Selecione pelo menos um passageiro.');
-            return;
+    // Modais e Formulários de Quartos
+    const addRoomBtn = document.getElementById('addRoomBtn');
+    const addRoomModal = document.getElementById('addRoomModal');
+    const closeRoomBtn = document.getElementsByClassName('close-room-btn')[0];
+    const roomTypeSelect = document.getElementById('roomType');
+    const roomPaxCountInput = document.getElementById('roomPaxCount');
+    const availablePassengersList = document.getElementById('availablePassengersList');
+    const addRoomForm = document.getElementById('addRoomForm');
+    const generateRoomListBtn = document.getElementById('generateRoomListBtn');
+    const assignedRoomsDisplay = document.getElementById('assignedRoomsDisplay'); // CORREÇÃO #1: Garante que o elemento existe
+
+
+    // ----------------------------------------------------
+    // FUNÇÕES AUXILIARES DE FORMATAÇÃO (Globalizadas)
+    // ----------------------------------------------------
+
+    // CORREÇÃO: Garante que esta função esteja globalmente disponível para evitar ReferenceError
+    function formatDateToBrazilian(dateString) {
+        if (!dateString) return '';
+        const parts = dateString.split('-'); 
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`; 
         }
-        
-        if (selectedPassengersData.length !== requiredPax) {
-            alert(`O quarto '${type}' requer ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
-            return;
-        }
-        
-        // 1. Adiciona o novo quarto
-        roomAssignments.push({
-            id: nextRoomNumber++, // Atribui um ID de quarto único
-            type: type,
-            passengers: selectedPassengersData
-        });
-
-        // 2. Fecha o modal e atualiza a exibição
-        addRoomModal.style.display = 'none';
-        renderAssignedRoomsDisplay();
-        
-        // 3. Atualiza a lista principal (em caso de remoção de passageiros)
-        updateSelectedListDisplay(); 
-    });
-
-    function getUnassignedPassengers() {
-        // 1. Pegar IDs de passageiros que JÁ ESTÃO em algum quarto
-        const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
-        
-        // 2. Filtrar a lista principal para incluir apenas quem NÃO está atribuído
-        return selectedPassengers.filter(p => !assignedIds.has(p.id));
+        return dateString;
     }
 
-    function openAddRoomModal() {
-        // Reseta o formulário
-        addRoomForm.reset();
-        roomPaxCountInput.value = '';
+    function formatAddress(person) {
+        const rua = person.rua || '';
+        const numero = person.numero || '';
+        const cidade = person.cidade || '';
+        const cep = person.cep || '';
         
-        const unassigned = getUnassignedPassengers();
-        availablePassengersList.innerHTML = '';
-        
-        if (unassigned.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
-            return;
-        }
-        
-        unassigned.forEach(p => {
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.name = 'passengerId';
-            checkbox.value = p.id;
-            checkbox.setAttribute('data-name', p.nome); // Guarda o nome para fácil acesso
-            
-            const label = document.createElement('label');
-            label.style.display = 'block';
-            label.appendChild(checkbox);
-            label.append(` ${p.nome} (CPF: ${p.cpf})`);
-            
-            availablePassengersList.appendChild(label);
-        });
-        
-        addRoomModal.style.display = 'block';
+        return `${rua} - ${numero}, ${cidade} - ${cep}`;
     }
 
 
@@ -344,24 +283,6 @@ roomTypeSelect.addEventListener('change', (e) => {
     // FUNÇÕES DE PERSISTÊNCIA (SUPABASE)
     // ----------------------------------------------------
 
-    /** Carrega todos os passageiros do Supabase para a memória local (database) */
-    /** Atualiza uma pessoa existente no Supabase */
-    async function updateExistingPerson(personData, id) {
-        const { data, error } = await supabaseClient
-            .from('passageiros')
-            .update(personData)
-            .eq('id', id) // Diz ao Supabase para atualizar a linha com este ID
-            .select();
-
-        if (error) {
-            console.error('Erro ao atualizar:', error);
-            alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
-            return null;
-        }
-        
-        // Retorna o objeto atualizado
-        return data[0]; 
-    }
     async function loadAllPassengers() {
         loadingMsg.textContent = 'Carregando dados...';
         const { data, error } = await supabaseClient
@@ -370,19 +291,19 @@ roomTypeSelect.addEventListener('change', (e) => {
 
         if (error) {
             console.error('Erro ao carregar dados:', error);
-            loadingMsg.textContent = 'Erro ao carregar dados do Supabase.';
+            loadingMsg.textContent = 'Erro ao carregar dados do Supabase. Verifique a tabela.';
             return;
         }
 
         database = data;
+        loadingMsg.textContent = `Total de ${database.length} pessoas salvas.`;
     }
 
-    /** Salva uma nova pessoa no Supabase */
     async function saveNewPerson(personData) {
         const { data, error } = await supabaseClient
             .from('passageiros')
             .insert([personData])
-            .select(); // Retorna o objeto salvo
+            .select(); 
 
         if (error) {
             console.error('Erro ao salvar:', error);
@@ -390,31 +311,45 @@ roomTypeSelect.addEventListener('change', (e) => {
             return null;
         }
 
-        // Adiciona a pessoa salva (com o ID do BD) à lista local
         const newPerson = data[0];
         database.push(newPerson);
         return newPerson;
     }
 
+    async function updateExistingPerson(personData, id) {
+        const { data, error } = await supabaseClient
+            .from('passageiros')
+            .update(personData)
+            .eq('id', id) 
+            .select();
+
+        if (error) {
+            console.error('Erro ao atualizar:', error);
+            alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
+            return null;
+        }
+        
+        return data[0]; 
+    }
+
 
     // ----------------------------------------------------
-    // LÓGICA DE PESQUISA E SELEÇÃO
+    // LÓGICA DE PESQUISA, SELEÇÃO E EXIBIÇÃO
     // ----------------------------------------------------
 
-    /** Atualiza a lista de selecionados na tela */
     function updateSelectedListDisplay() {
-    selectedPassengersDiv.innerHTML = '';
+        selectedPassengersDiv.innerHTML = '';
         if (selectedPassengers.length === 0) {
             emptyListMsg.style.display = 'block';
             finishListBtn.disabled = true;
         } else {
             emptyListMsg.style.display = 'none';
             finishListBtn.disabled = false;
-        
+            
             selectedPassengers.forEach(person => {
                 const item = document.createElement('div');
                 item.className = 'list-item';
-            
+                
                 // Botões de Ação
                 const actionButtons = document.createElement('span');
                 actionButtons.innerHTML = `
@@ -428,93 +363,52 @@ roomTypeSelect.addEventListener('change', (e) => {
                         <strong>${person.nome}</strong> | CPF: ${person.cpf}
                     </span>
                 `;
-                item.appendChild(actionButtons); // Adiciona os botões de ação
+                item.appendChild(actionButtons); 
                 selectedPassengersDiv.appendChild(item);
             });
         }
-        renderRoomList();
-    }
-    function renderRoomList() {
-        const roomListDiv = document.getElementById('roomListAssignmentsDiv');
         
-        if (selectedPassengers.length === 0) {
-            roomListDiv.innerHTML = '<p>Selecione passageiros na lista acima para começar a atribuir quartos.</p>';
-            return;
-        }
-        
-        let html = '<table><thead><tr><th>Nome</th><th>CPF</th><th>Data Nasc.</th><th>Quarto</th></tr></thead><tbody>';
-        
-        selectedPassengers.forEach(person => {
-            const currentAssignment = roomAssignments.get(person.id) || ''; // Pega o último quarto atribuído
-            
-            // Cria o dropdown com as opções
-            let selectHtml = `<select data-id="${person.id}" class="room-selector">`;
-            selectHtml += '<option value="">-- Selecione o Quarto --</option>';
-            
-            roomTypes.forEach(type => {
-                const selected = currentAssignment === type ? 'selected' : '';
-                selectHtml += `<option value="${type}" ${selected}>${type}</option>`;
-            });
-            selectHtml += '</select>';
-
-            // Insere na tabela
-            html += `
-                <tr id="room-row-${person.id}">
-                    <td>${person.nome}</td>
-                    <td>${person.cpf}</td>
-                    <td>${formatDateToBrazilian(person.data_nascimento)}</td>
-                    <td>${selectHtml}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        roomListDiv.innerHTML = html;
-
-        // Adiciona o Listener para salvar a atribuição sempre que o dropdown muda
-        document.querySelectorAll('.room-selector').forEach(select => {
-            select.addEventListener('change', (e) => {
-                const id = parseInt(e.target.dataset.id);
-                const type = e.target.value;
-                
-                if (type) {
-                    roomAssignments.set(id, type);
-                } else {
-                    roomAssignments.delete(id); // Remove se for a opção "-- Selecione..."
-                }
-            });
-        });
+        // NOVO: Atualiza a lista de quartos (necessário após qualquer mudança de seleção)
+        renderAssignedRoomsDisplay(); 
     }
 
-    /** Adiciona um passageiro à lista de exportação */
-    function addPassengerToList(person) {
-        // Usa o 'id' do banco de dados como chave única
+    window.addPassengerToList = function(person) {
         const alreadyExists = selectedPassengers.some(p => p.id === person.id);
         if (alreadyExists) return; 
 
         selectedPassengers.push(person);
         updateSelectedListDisplay();
         
-        // Limpa a busca e resultados após adicionar
         searchInput.value = '';
-        searchResultsDiv.innerHTML = '';
-        loadingMsg.textContent = `Total de ${database.length} pessoas salvas.`;
+        searchInput.dispatchEvent(new Event('input')); 
     }
 
-    /** Remove um passageiro da lista de exportação */
     window.removePassengerFromList = function(id) {
         selectedPassengers = selectedPassengers.filter(person => person.id !== id);
+        
+        // NOVO: Remove o passageiro de qualquer quarto atribuído
+        roomAssignments.forEach(room => {
+            room.passengers = room.passengers.filter(p => p.id !== id);
+        });
+        // Remove quartos vazios
+        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
+
         updateSelectedListDisplay();
+        searchInput.dispatchEvent(new Event('input')); 
     }
     
-    // Lógica da Pesquisa
     searchInput.addEventListener('input', function() {
         const searchTerm = searchInput.value.toLowerCase().trim();
-        searchResultsDiv.innerHTML = ''; // Limpa resultados
+        searchResultsDiv.innerHTML = ''; 
+
+        if (searchTerm.length < 2) {
+            searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
+            return;
+        }
 
         const results = database.filter(person => {
             const isSelected = selectedPassengers.some(p => p.id === person.id);
-            if (isSelected) return false; // Não exibe quem já está selecionado
+            if (isSelected) return false; 
             
             return person.nome.toLowerCase().includes(searchTerm) || 
                    person.cpf.toLowerCase().includes(searchTerm);
@@ -527,16 +421,117 @@ roomTypeSelect.addEventListener('change', (e) => {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = 'list-item';
                 
+                const personJsonSafe = JSON.stringify(person).replace(/"/g, '&quot;'); 
+
                 resultDiv.innerHTML = `
                     <span>${person.nome} (${person.cpf})</span>
-                    <button onclick='addPassengerToList(${JSON.stringify(person)})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
+                    <button onclick='addPassengerToList(${personJsonSafe})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
                 `;
                 searchResultsDiv.appendChild(resultDiv);
             });
         }
     });
+
+
+    // ----------------------------------------------------
+    // LÓGICA DE MODAIS DE PESSOA (Adicionar/Editar)
+    // ----------------------------------------------------
+
+    // Modal Adicionar Pessoa
+    document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
+    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+
+        const newPersonData = {
+            nome: document.getElementById('nome').value,
+            cpf: document.getElementById('cpf').value,
+            data_nascimento: document.getElementById('nascimento').value,
+            rua: document.getElementById('rua').value,
+            numero: document.getElementById('numero').value,
+            cidade: document.getElementById('cidade').value,
+            cep: document.getElementById('cep').value,
+            telefone: document.getElementById('telefone').value,
+        };
+        
+        const savedPerson = await saveNewPerson(newPersonData);
+
+        if (savedPerson) {
+            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
+            window.addPassengerToList(savedPerson); 
+            form.reset();
+            modal.style.display = 'none';
+        }
+    });
+
+    // Modal Editar Pessoa
+    window.openEditModal = function(id) {
+        const personToEdit = database.find(p => p.id === id);
+        if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
+
+        document.getElementById('edit-id').value = personToEdit.id;
+        document.getElementById('edit-nome').value = personToEdit.nome;
+        document.getElementById('edit-cpf').value = personToEdit.cpf;
+        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
+        document.getElementById('edit-rua').value = personToEdit.rua || '';
+        document.getElementById('edit-numero').value = personToEdit.numero || '';
+        document.getElementById('edit-cidade').value = personToEdit.cidade || '';
+        document.getElementById('edit-cep').value = personToEdit.cep || '';
+        document.getElementById('edit-telefone').value = personToEdit.telefone;
+
+        editModal.style.display = 'block';
+    };
+
+    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === editModal) { editModal.style.display = 'none'; } });
+
+    editForm.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+
+        const id = parseInt(document.getElementById('edit-id').value);
+        
+        const updatedData = {
+            nome: document.getElementById('edit-nome').value,
+            cpf: document.getElementById('edit-cpf').value,
+            data_nascimento: document.getElementById('edit-nascimento').value,
+            rua: document.getElementById('edit-rua').value,
+            numero: document.getElementById('edit-numero').value,
+            cidade: document.getElementById('edit-cidade').value,
+            cep: document.getElementById('edit-cep').value,
+            telefone: document.getElementById('edit-telefone').value,
+        };
+
+        const savedPerson = await updateExistingPerson(updatedData, id);
+
+        if (savedPerson) {
+            const dbIndex = database.findIndex(p => p.id === id);
+            if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
+
+            const selIndex = selectedPassengers.findIndex(p => p.id === id);
+            if (selIndex !== -1) { selectedPassengers[selIndex] = savedPerson; }
+
+            updateSelectedListDisplay();
+            editModal.style.display = 'none';
+        }
+    });
+
+
+    // ----------------------------------------------------
+    // LÓGICA DE GESTÃO DE QUARTOS
+    // ----------------------------------------------------
+
+    function getUnassignedPassengers() {
+        // 1. Pegar IDs de passageiros que JÁ ESTÃO em algum quarto
+        const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
+        
+        // 2. Filtrar a lista principal para incluir apenas quem NÃO está atribuído
+        return selectedPassengers.filter(p => !assignedIds.has(p.id));
+    }
+
     function renderAssignedRoomsDisplay() {
-        const displayDiv = document.getElementById('assignedRoomsDisplay');
+        const displayDiv = assignedRoomsDisplay; // Usando a variável DOM
         
         if (roomAssignments.length === 0) {
             displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
@@ -568,133 +563,106 @@ roomTypeSelect.addEventListener('change', (e) => {
 
     window.removeRoom = function(roomId) {
         if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
-            // Remove o quarto do array
             roomAssignments = roomAssignments.filter(room => room.id !== roomId);
-            
-            // Atualiza as exibições
             renderAssignedRoomsDisplay();
             updateSelectedListDisplay();
         }
     };
 
-    // ----------------------------------------------------
-    // LÓGICA DO MODAL E FORMULÁRIO
-    // ----------------------------------------------------
 
-    // Abre o Modal
-    document.getElementById('addPersonBtn').onclick = function() { modal.style.display = 'block'; }
-    // Fecha o Modal
-    document.getElementsByClassName('close-btn')[0].onclick = function() { modal.style.display = 'none'; }
-    window.onclick = function(event) { if (event.target == modal) { modal.style.display = 'none'; } }
-    // --- NOVAS REFERÊNCIAS ---
-    const editModal = document.getElementById('editPersonModal');
-    const editForm = document.getElementById('editPersonForm');
-    const closeEditBtn = document.getElementsByClassName('close-edit-btn')[0];
+    // --- Lógica do Modal Adicionar Quarto ---
+    addRoomBtn.addEventListener('click', () => {
+        openAddRoomModal();
+    });
 
-    // Abre o modal de edição e preenche os campos com os dados atuais
-    window.openEditModal = function(id) {
-        // 1. Encontra a pessoa no banco de dados local (database)
-        const personToEdit = database.find(p => p.id === id);
-        if (!personToEdit) {
-            alert('Passageiro não encontrado.');
+    closeRoomBtn.addEventListener('click', () => {
+        addRoomModal.style.display = 'none';
+    });
+    
+    window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
+
+
+    roomTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        const capacity = roomCapacityMap[type] || 0;
+        roomPaxCountInput.value = capacity;
+        roomPaxCountInput.disabled = true;
+    });
+
+    function openAddRoomModal() {
+        addRoomForm.reset();
+        roomPaxCountInput.value = '';
+        
+        const unassigned = getUnassignedPassengers();
+        availablePassengersList.innerHTML = '';
+        
+        if (unassigned.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
+        } else if (selectedPassengers.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
+        } else {
+            unassigned.forEach(p => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'passengerId';
+                checkbox.value = p.id;
+                checkbox.setAttribute('data-name', p.nome);
+                
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.appendChild(checkbox);
+                label.append(` ${p.nome} (CPF: ${p.cpf})`);
+                
+                availablePassengersList.appendChild(label);
+            });
+        }
+        
+        addRoomModal.style.display = 'block';
+    }
+
+    // Envio do Formulário do Quarto
+    addRoomForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const type = roomTypeSelect.value;
+        const requiredPax = parseInt(roomPaxCountInput.value);
+        
+        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
+        const selectedPassengersData = checkedBoxes.map(box => 
+            selectedPassengers.find(p => p.id === parseInt(box.value))
+        );
+        
+        if (selectedPassengersData.length === 0) {
+            alert('Selecione pelo menos um passageiro.');
             return;
         }
-
-        // 2. Preenche o formulário
-        document.getElementById('edit-id').value = personToEdit.id;
-        document.getElementById('edit-nome').value = personToEdit.nome;
-        document.getElementById('edit-cpf').value = personToEdit.cpf;
-        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
-        document.getElementById('edit-rua').value = personToEdit.rua;
-        document.getElementById('edit-numero').value = personToEdit.numero;
-        document.getElementById('edit-cidade').value = personToEdit.cidade;
-        document.getElementById('edit-cep').value = personToEdit.cep;
         
-        document.getElementById('edit-telefone').value = personToEdit.telefone;
-
-        // 3. Exibe o modal
-        editModal.style.display = 'block';
-    };
-
-    // Fecha o Modal de Edição (X)
-    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
-
-    // Envio do Formulário de Edição (Salva no Supabase e atualiza a interface)
-    editForm.addEventListener('submit', async function(e) {
-    e.preventDefault(); 
-
-        const id = parseInt(document.getElementById('edit-id').value);
-        
-        // ATENÇÃO: Mudamos para os novos 4 campos de endereço
-        const updatedData = {
-            nome: document.getElementById('edit-nome').value,
-            cpf: document.getElementById('edit-cpf').value,
-            data_nascimento: document.getElementById('edit-nascimento').value,
-            rua: document.getElementById('edit-rua').value,
-            numero: document.getElementById('edit-numero').value,
-            cidade: document.getElementById('edit-cidade').value,
-            cep: document.getElementById('edit-cep').value,
-            telefone: document.getElementById('edit-telefone').value,
-        };
-
-        // 1. Chama a função de atualização do Supabase
-        const savedPerson = await updateExistingPerson(updatedData, id);
-
-        if (savedPerson) {
-            alert(`Informações de "${savedPerson.nome}" salvas com sucesso!`);
-            
-            // 2. Atualiza os dados na cópia local (database)
-            const dbIndex = database.findIndex(p => p.id === id);
-            if (dbIndex !== -1) {
-                database[dbIndex] = savedPerson;
-            }
-
-            // 3. Atualiza os dados na lista de selecionados (selectedPassengers)
-            const selIndex = selectedPassengers.findIndex(p => p.id === id);
-            if (selIndex !== -1) {
-                selectedPassengers[selIndex] = savedPerson;
-            }
-
-            // 4. Recarrega as listas
-            updateSelectedListDisplay();
-            
-            // 5. Fecha o modal
-            editModal.style.display = 'none';
+        if (selectedPassengersData.length !== requiredPax) {
+            alert(`O quarto '${type}' requer ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
+            return;
         }
-    });
-
-    // Envio do Formulário (Salva no Supabase)
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-
-        // ATENÇÃO: Mudamos para os novos 4 campos de endereço
-        const newPersonData = {
-            nome: document.getElementById('nome').value,
-            cpf: document.getElementById('cpf').value,
-            data_nascimento: document.getElementById('nascimento').value,
-            rua: document.getElementById('rua').value,      // NOVO
-            numero: document.getElementById('numero').value,  // NOVO
-            cidade: document.getElementById('cidade').value,  // NOVO
-            cep: document.getElementById('cep').value,        // NOVO
-            telefone: document.getElementById('telefone').value,
-        };
         
-        const savedPerson = await saveNewPerson(newPersonData);
+        // 1. Adiciona o novo quarto
+        roomAssignments.push({
+            id: nextRoomNumber++, 
+            type: type,
+            passengers: selectedPassengersData
+        });
 
-        if (savedPerson) {
-            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
-            addPassengerToList(savedPerson); // Adiciona na lista atual
-            form.reset();
-            modal.style.display = 'none';
-        }
+        // 2. Fecha o modal e atualiza a exibição
+        addRoomModal.style.display = 'none';
+        renderAssignedRoomsDisplay();
+        
+        // 3. Atualiza a lista principal (em caso de remoção de passageiros)
+        updateSelectedListDisplay(); 
     });
 
 
     // ----------------------------------------------------
-    // LÓGICA DE GERAÇÃO DO EXCEL
+    // LÓGICA DE GERAÇÃO DOS 3 ARQUIVOS
     // ----------------------------------------------------
 
-   finishListBtn.addEventListener('click', function() {
+    finishListBtn.addEventListener('click', function() {
         const destinationInput = document.getElementById('tripDestination');
         const destination = destinationInput.value.trim();
 
@@ -709,32 +677,12 @@ roomTypeSelect.addEventListener('change', (e) => {
             return;
         }
 
-        // Função para formatar a string de data (YYYY-MM-DD) para o padrão brasileiro (DD/MM/YYYY)
-        function formatDateToBrazilian(dateString) {
-            if (!dateString) return '';
-            const parts = dateString.split('-'); 
-            if (parts.length === 3) {
-                return `${parts[2]}/${parts[1]}/${parts[0]}`; 
-            }
-            return dateString;
-        }
-        function formatAddress(person) {
-            // Evita 'undefined' se o campo estiver vazio
-            const rua = person.rua || '';
-            const numero = person.numero || '';
-            const cidade = person.cidade || '';
-            const cep = person.cep || '';
-            
-            // Aplica o formato: Rua Tal - Número, Cidade - CEP
-            return `${rua} - ${numero}, ${cidade} - ${cep}`;
-        }
-
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
 
         // ----------------------------------------------------
-        // 1. GERAÇÃO DA LISTA COMPLETA (XLSX) - Nome: [Destino]_COMPLETO.xlsx
+        // 1. GERAÇÃO DA LISTA COMPLETA (XLSX)
         // ----------------------------------------------------
-        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
+        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO COMPLETO', 'TELEFONE' ];
         
         const dataForSheet = selectedPassengers.map(person => ([
             person.nome, 
@@ -754,19 +702,17 @@ roomTypeSelect.addEventListener('change', (e) => {
 
 
         // ----------------------------------------------------
-        // 2. GERAÇÃO DA LISTA COMPLETA (PDF PAISAGEM) - Nome: [Destino]_COMPLETO.pdf
+        // 2. GERAÇÃO DA LISTA COMPLETA (PDF PAISAGEM)
         // ----------------------------------------------------
         
         const { jsPDF } = window.jspdf;
-        
-        // PDF COMPLETO: Paisagem
         const docCompleto = new jsPDF('landscape', 'mm', 'a4'); 
         
         const headersCompleto = [
             { header: 'NOME', dataKey: 'nome' },
             { header: 'CPF', dataKey: 'cpf' },
             { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
-            { header: 'ENDEREÇO', dataKey: 'endereco' },
+            { header: 'ENDEREÇO COMPLETO', dataKey: 'endereco_completo' },
             { header: 'TELEFONE', dataKey: 'telefone' }
         ];
 
@@ -774,7 +720,7 @@ roomTypeSelect.addEventListener('change', (e) => {
             nome: person.nome,
             cpf: person.cpf,
             data_nascimento: formatDateToBrazilian(person.data_nascimento),
-            endereco: formatAddress(person),
+            endereco_completo: formatAddress(person),
             telefone: person.telefone
         }));
 
@@ -798,10 +744,9 @@ roomTypeSelect.addEventListener('change', (e) => {
 
 
         // ----------------------------------------------------
-        // 3. GERAÇÃO DA LISTA SIMPLES (PDF RETRATO) - Nome: [Destino]_ONIBUS.pdf
+        // 3. GERAÇÃO DA LISTA SIMPLES (PDF RETRATO)
         // ----------------------------------------------------
 
-        // PDF SIMPLES: Retrato
         const docSimples = new jsPDF('portrait', 'mm', 'a4'); 
 
         const headersSimples = [
@@ -822,17 +767,23 @@ roomTypeSelect.addEventListener('change', (e) => {
             bodyStyles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
             
             columnStyles: {
-                0: { cellWidth: 100 }, // NOME
-                1: { cellWidth: 50, halign: 'center' } // CPF
+                0: { cellWidth: 100 }, 
+                1: { cellWidth: 50, halign: 'center' } 
             },
             startY: 20,
-            margin: { top: 10, left: 30, right: 30 } // Margens maiores para centralizar o conteúdo simples
+            margin: { top: 10, left: 30, right: 30 } 
         });
 
         docSimples.save(`${baseFileName}_ONIBUS.pdf`);
+
+
+        alert(`Três arquivos gerados com sucesso:\n- ${baseFileName}_ONIBUS.pdf\n- ${baseFileName}_COMPLETO.pdf\n- ${baseFileName}_COMPLETO.xlsx`);
     });
 
-   const generateRoomListBtn = document.getElementById('generateRoomListBtn');
+
+    // ----------------------------------------------------
+    // LÓGICA DE GERAÇÃO DO ROOMLIST PDF (NOVO BOTÃO)
+    // ----------------------------------------------------
 
     generateRoomListBtn.addEventListener('click', function() {
         const destinationInput = document.getElementById('tripDestination');
@@ -850,8 +801,6 @@ roomTypeSelect.addEventListener('change', (e) => {
         }
 
         const { jsPDF } = window.jspdf;
-        
-        // PDF ROOMLIST: Retrato (portrait)
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
         
         const headersRoomList = [
@@ -891,25 +840,25 @@ roomTypeSelect.addEventListener('change', (e) => {
             body: finalTableData.map(obj => Object.values(obj)),
             
             // Estilos
-            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 },
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 }, 
             bodyStyles: { fontSize: 9, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
             
-            // Estilos para as linhas do corpo (aplica negrito e cor de fundo apenas ao título do quarto)
+            // Estilos de Linha (Título do Quarto)
             didParseCell: (data) => {
                 const rowData = finalTableData[data.row.index];
                 if (rowData && rowData.quarto.startsWith('QUARTO ')) {
                     data.cell.styles.fontStyle = 'bold';
-                    data.cell.styles.fillColor = [220, 220, 220]; // Cor de fundo mais clara para o título do quarto
+                    data.cell.styles.fillColor = [220, 220, 220]; 
                     data.cell.styles.halign = 'left';
                 }
             },
             
             // Largura das Colunas
             columnStyles: {
-                0: { cellWidth: 40, halign: 'left' }, // QUARTO
-                1: { cellWidth: 60, halign: 'left' }, // NOME
-                2: { cellWidth: 30, halign: 'center' }, // DATA DE NASCIMENTO
-                3: { cellWidth: 35, halign: 'center' } // CPF
+                0: { cellWidth: 40, halign: 'left' }, 
+                1: { cellWidth: 60, halign: 'left' }, 
+                2: { cellWidth: 30, halign: 'center' }, 
+                3: { cellWidth: 35, halign: 'center' } 
             },
             startY: 20,
             margin: { top: 10, left: 10, right: 10 }
@@ -919,12 +868,12 @@ roomTypeSelect.addEventListener('change', (e) => {
         alert(`Lista de Quartos gerada com sucesso: ${baseFileName}_ROOMLIST.pdf`);
     });
 
+
     // ----------------------------------------------------
     // INICIALIZAÇÃO
     // ----------------------------------------------------
 
-    // Inicia carregando os dados do banco e a interface
-    loadAllPassengers().then(updateSelectedListDisplay); 
+    loadAllPassengers().then(updateSelectedListDisplay);
 </script>
 
 </body>
