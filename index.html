@@ -807,7 +807,7 @@
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
         
         // ----------------------------------------------------
-        // 1. AGRUPAMENTO E PREPARAÇÃO DOS DADOS
+        // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
         // ----------------------------------------------------
 
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
@@ -819,10 +819,11 @@
         }, {});
 
         let finalY = 15;
-        let tableIndex = 0;
-        
-        // Array que armazena os dados do corpo e metadados de estilo para o hook
-        let bodyDataForStyling = []; 
+        let tableIndex = 0; 
+
+        // ----------------------------------------------------
+        // 2. GERAÇÃO DO PDF SEM MESCLAS
+        // ----------------------------------------------------
 
         roomTypes.forEach((category) => {
             const rooms = roomsByType[category] || [];
@@ -841,43 +842,36 @@
             // --- DESENHA O TÍTULO DA CATEGORIA (FORA DA TABELA) ---
             docRoomList.setFontSize(18);
             docRoomList.setFont(undefined, 'bold');
-            docRoomList.setTextColor(0, 0, 0);
+            docRoomList.setTextColor(0, 0, 0); 
             docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
             finalY += 5; 
             
-            let finalTableData = []; // Array de arrays para o AutoTable
+            
+            let finalTableData = [];
             let roomCounter = 1;
             
             // Prepara os dados na estrutura de linhas
             rooms.forEach(room => {
-                const passengerCount = room.passengers.length;
-                const roomCapacity = roomCapacityMap[room.type] || 1; // Pega a capacidade para o cálculo do estilo
-                
                 room.passengers.forEach((person, paxIndex) => {
                     const isFirstInRoom = paxIndex === 0;
                     
-                    // 1. Dados da Linha
+                    // O número do quarto só aparece na primeira linha do grupo
+                    const roomDisplay = isFirstInRoom ? roomCounter.toString() : '';
+                    
+                    // Linhas dos Passageiros para a tabela
                     const row = [
-                        isFirstInRoom ? roomCounter.toString() : '', 
+                        roomDisplay, // QUARTO
                         person.nome,
                         formatDateToBrazilian(person.data_nascimento),
                         person.cpf
                     ];
                     finalTableData.push(row);
-                    
-                    // 2. Metadados de Estilo para o Hook
-                    bodyDataForStyling.push({
-                        isFirst: isFirstInRoom,
-                        paxCount: passengerCount,
-                        roomIndex: roomCounter,
-                        capacity: roomCapacity // O N para o padrão N azul, N branco
-                    });
                 });
                 roomCounter++;
             });
 
 
-            // --- ESTRUTURA DE CABEÇALHO ---
+            // --- ESTRUTURA DE CABEÇALHO (APENAS 1 LINHA) ---
             const headersCategory = [
                 ['QUARTO', 'NOME', 'DATA DE NASCIMENTO', 'CPF']
             ];
@@ -889,8 +883,12 @@
                 body: finalTableData, 
                 startY: finalY + 2, 
                 theme: 'grid', 
-                margin: { top: 10, left: 10, right: 10 }, 
-                styles: { fontSize: 9, cellPadding: 2, textColor: [0, 0, 0] }, 
+                margin: { top: 10, left: 10, right: 10 },
+                styles: { 
+                    fontSize: 9, 
+                    cellPadding: 2, 
+                    textColor: [0, 0, 0]
+                }, 
 
                 headStyles: { 
                     fontStyle: 'bold', 
@@ -907,53 +905,7 @@
                     3: { cellWidth: 30, halign: 'center' } 
                 },
                 
-                // HOOK: Para o número do quarto (Mesclagem Vertical Visual) e o Estilo da Linha
-                didDrawCell: (data) => {
-                    const rowStyleData = bodyDataForStyling[data.row.index];
-                    
-                    // 1. LÓGICA DE COR ALTERNADA (N AZUL, N BRANCO)
-                    if (data.section === 'body') {
-                        // O índice de repetição é o número do quarto atual (roomIndex)
-                        // Se o roomIndex for ímpar, aplica a cor. Se for par, é branco.
-                        // O módulo 2 serve para a alternância simples de cor por quarto.
-                        
-                        if (rowStyleData && rowStyleData.roomIndex % 2 !== 0) {
-                            // Quarto ÍMPAR (Cor Azul Claro)
-                            data.cell.styles.fillColor = [230, 240, 255]; 
-                        } else {
-                            // Quarto PAR (Cor Branca)
-                            data.cell.styles.fillColor = [255, 255, 255]; 
-                        }
-                    }
-
-                    // 2. LÓGICA DO NÚMERO GRANDE (Apenas Coluna 0)
-                    if (data.column.index === 0 && data.section === 'body' && rowStyleData && rowStyleData.isFirst) {
-                        const roomNumber = rowStyleData.roomIndex.toString();
-                        const paxCount = rowStyleData.paxCount;
-                        
-                        // Desenha o fundo da mescla (aplica o cinza, se necessário)
-                        if (data.cell.styles.fillColor) {
-                            docRoomList.setFillColor(data.cell.styles.fillColor[0], data.cell.styles.fillColor[1], data.cell.styles.fillColor[2]); 
-                        }
-                        docRoomList.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height * paxCount, 'F');
-                        
-                        // Desenha o número do quarto GRANDE E CENTRALIZADO
-                        docRoomList.setFontSize(22);
-                        docRoomList.setFont(undefined, 'bold');
-                        docRoomList.setTextColor(0, 0, 0); 
-
-                        docRoomList.text(
-                            roomNumber,
-                            data.cell.x + data.cell.width / 2, 
-                            data.cell.y + (data.cell.height * paxCount) / 2 + 3, 
-                            { align: 'center', baseline: 'middle' }
-                        );
-                        
-                        docRoomList.setFontSize(9);
-                        docRoomList.setFont(undefined, 'normal');
-                    }
-                },
-
+                // Hook para obter a posição final da tabela
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
@@ -963,7 +915,7 @@
             const table = docRoomList.autoTable.previous;
             finalY = table.finalY;
             
-            tableIndex++;
+            tableIndex++; 
         });
 
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
