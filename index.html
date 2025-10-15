@@ -214,17 +214,14 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // --- VARIÁVEIS GLOBAIS E ESTRUTURAS DE DADOS ---
-    let database = []; // Cópia de todos os passageiros
-    let selectedPassengers = []; // Passageiros na lista atual (para exportar)
-    let roomAssignments = []; // NOVO: Array de objetos de quartos atribuídos
-    let nextRoomNumber = 1; // Contador para ID do quarto
+    let database = []; 
+    let selectedPassengers = []; 
+    let roomAssignments = []; // Array de objetos de quartos atribuídos
+    let nextRoomNumber = 1; 
 
     const roomCapacityMap = {
-        'Individual': 1,
-        'Casal': 2,
-        'Duplo': 2,
-        'Triplo': 3,
-        'Quadruplo': 4
+        'Individual': 1, 'Casal': 2, 'Duplo': 2,
+        'Triplo': 3, 'Quadruplo': 4
     };
 
     // --- REFERÊNCIAS DOM ---
@@ -252,14 +249,13 @@
     const availablePassengersList = document.getElementById('availablePassengersList');
     const addRoomForm = document.getElementById('addRoomForm');
     const generateRoomListBtn = document.getElementById('generateRoomListBtn');
-    const assignedRoomsDisplay = document.getElementById('assignedRoomsDisplay'); // CORREÇÃO #1: Garante que o elemento existe
+    const assignedRoomsDisplay = document.getElementById('assignedRoomsDisplay'); 
 
 
     // ----------------------------------------------------
-    // FUNÇÕES AUXILIARES DE FORMATAÇÃO (Globalizadas)
+    // FUNÇÕES AUXILIARES DE FORMATAÇÃO (Tudo aqui para evitar ReferenceError)
     // ----------------------------------------------------
 
-    // CORREÇÃO: Garante que esta função esteja globalmente disponível para evitar ReferenceError
     function formatDateToBrazilian(dateString) {
         if (!dateString) return '';
         const parts = dateString.split('-'); 
@@ -283,6 +279,21 @@
     // FUNÇÕES DE PERSISTÊNCIA (SUPABASE)
     // ----------------------------------------------------
 
+    async function updateExistingPerson(personData, id) {
+        const { data, error } = await supabaseClient
+            .from('passageiros')
+            .update(personData)
+            .eq('id', id)
+            .select();
+        // ... (resto da função)
+        if (error) {
+            console.error('Erro ao atualizar:', error);
+            alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
+            return null;
+        }
+        return data[0];
+    }
+    
     async function loadAllPassengers() {
         loadingMsg.textContent = 'Carregando dados...';
         const { data, error } = await supabaseClient
@@ -291,7 +302,7 @@
 
         if (error) {
             console.error('Erro ao carregar dados:', error);
-            loadingMsg.textContent = 'Erro ao carregar dados do Supabase. Verifique a tabela.';
+            loadingMsg.textContent = 'Erro ao carregar dados do Supabase.';
             return;
         }
 
@@ -316,20 +327,84 @@
         return newPerson;
     }
 
-    async function updateExistingPerson(personData, id) {
-        const { data, error } = await supabaseClient
-            .from('passageiros')
-            .update(personData)
-            .eq('id', id) 
-            .select();
 
-        if (error) {
-            console.error('Erro ao atualizar:', error);
-            alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
-            return null;
+    // ----------------------------------------------------
+    // LÓGICA DE GESTÃO DE QUARTOS (NOVAS FUNÇÕES)
+    // ----------------------------------------------------
+    
+    function getUnassignedPassengers() {
+        const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
+        return selectedPassengers.filter(p => !assignedIds.has(p.id));
+    }
+
+    function renderAssignedRoomsDisplay() {
+        const displayDiv = assignedRoomsDisplay;
+        
+        if (roomAssignments.length === 0) {
+            displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
+            return;
         }
         
-        return data[0]; 
+        let html = '<h4>Quartos Atribuídos:</h4>';
+        html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+        html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
+        
+        roomAssignments.forEach(room => {
+            const passengerNames = room.passengers.map(p => p.nome).join(', ');
+            
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="font-weight: bold;">${room.id}</td>
+                    <td>${room.type}</td>
+                    <td>${passengerNames}</td>
+                    <td>
+                        <button onclick="removeRoom(${room.id})" style="background-color: #dc3545; color: white; padding: 3px 8px; border: none; border-radius: 3px;">Remover</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        displayDiv.innerHTML = html;
+    }
+
+    window.removeRoom = function(roomId) {
+        if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
+            roomAssignments = roomAssignments.filter(room => room.id !== roomId);
+            renderAssignedRoomsDisplay();
+            updateSelectedListDisplay();
+        }
+    };
+
+    function openAddRoomModal() {
+        addRoomForm.reset();
+        roomPaxCountInput.value = '';
+        
+        const unassigned = getUnassignedPassengers();
+        availablePassengersList.innerHTML = '';
+        
+        if (unassigned.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
+        } else if (selectedPassengers.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
+        } else {
+            unassigned.forEach(p => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'passengerId';
+                checkbox.value = p.id;
+                checkbox.setAttribute('data-name', p.nome);
+                
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.appendChild(checkbox);
+                label.append(` ${p.nome} (CPF: ${p.cpf})`);
+                
+                availablePassengersList.appendChild(label);
+            });
+        }
+        
+        addRoomModal.style.display = 'block';
     }
 
 
@@ -401,7 +476,7 @@
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; 
 
-        if (searchTerm.length < 1) {
+        if (searchTerm.length < 2) {
             searchResultsDiv.innerHTML = '<p>Digite nome ou CPF para pesquisar no banco de dados.</p>';
             return;
         }
@@ -434,7 +509,7 @@
 
 
     // ----------------------------------------------------
-    // LÓGICA DE MODAIS DE PESSOA (Adicionar/Editar)
+    // LÓGICA DE MODAIS E EVENT LISTENERS
     // ----------------------------------------------------
 
     // Modal Adicionar Pessoa
@@ -442,9 +517,9 @@
     closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
     window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
 
+    // Envio do Formulário Adicionar Pessoa
     form.addEventListener('submit', async function(e) {
         e.preventDefault(); 
-
         const newPersonData = {
             nome: document.getElementById('nome').value,
             cpf: document.getElementById('cpf').value,
@@ -455,9 +530,7 @@
             cep: document.getElementById('cep').value,
             telefone: document.getElementById('telefone').value,
         };
-        
         const savedPerson = await saveNewPerson(newPersonData);
-
         if (savedPerson) {
             alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
             window.addPassengerToList(savedPerson); 
@@ -485,13 +558,10 @@
     };
 
     closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
-    window.addEventListener('click', function(event) { if (event.target === editModal) { editModal.style.display = 'none'; } });
 
     editForm.addEventListener('submit', async function(e) {
         e.preventDefault(); 
-
         const id = parseInt(document.getElementById('edit-id').value);
-        
         const updatedData = {
             nome: document.getElementById('edit-nome').value,
             cpf: document.getElementById('edit-cpf').value,
@@ -502,85 +572,22 @@
             cep: document.getElementById('edit-cep').value,
             telefone: document.getElementById('edit-telefone').value,
         };
-
         const savedPerson = await updateExistingPerson(updatedData, id);
-
         if (savedPerson) {
             const dbIndex = database.findIndex(p => p.id === id);
             if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
-
             const selIndex = selectedPassengers.findIndex(p => p.id === id);
             if (selIndex !== -1) { selectedPassengers[selIndex] = savedPerson; }
-
             updateSelectedListDisplay();
             editModal.style.display = 'none';
         }
     });
 
 
-    // ----------------------------------------------------
-    // LÓGICA DE GESTÃO DE QUARTOS
-    // ----------------------------------------------------
-
-    function getUnassignedPassengers() {
-        // 1. Pegar IDs de passageiros que JÁ ESTÃO em algum quarto
-        const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
-        
-        // 2. Filtrar a lista principal para incluir apenas quem NÃO está atribuído
-        return selectedPassengers.filter(p => !assignedIds.has(p.id));
-    }
-
-    function renderAssignedRoomsDisplay() {
-        const displayDiv = assignedRoomsDisplay; // Usando a variável DOM
-        
-        if (roomAssignments.length === 0) {
-            displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
-            return;
-        }
-        
-        let html = '<h4>Quartos Atribuídos:</h4>';
-        html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
-        html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
-        
-        roomAssignments.forEach(room => {
-            const passengerNames = room.passengers.map(p => p.nome).join(', ');
-            
-            html += `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="font-weight: bold;">${room.id}</td>
-                    <td>${room.type}</td>
-                    <td>${passengerNames}</td>
-                    <td>
-                        <button onclick="removeRoom(${room.id})" style="background-color: #dc3545; color: white; padding: 3px 8px; border: none; border-radius: 3px;">Remover</button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        displayDiv.innerHTML = html;
-    }
-
-    window.removeRoom = function(roomId) {
-        if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
-            roomAssignments = roomAssignments.filter(room => room.id !== roomId);
-            renderAssignedRoomsDisplay();
-            updateSelectedListDisplay();
-        }
-    };
-
-
-    // --- Lógica do Modal Adicionar Quarto ---
-    addRoomBtn.addEventListener('click', () => {
-        openAddRoomModal();
-    });
-
-    closeRoomBtn.addEventListener('click', () => {
-        addRoomModal.style.display = 'none';
-    });
-    
+    // Modal Adicionar Quarto
+    addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
+    closeRoomBtn.addEventListener('click', () => { addRoomModal.style.display = 'none'; });
     window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
-
 
     roomTypeSelect.addEventListener('change', (e) => {
         const type = e.target.value;
@@ -589,38 +596,6 @@
         roomPaxCountInput.disabled = true;
     });
 
-    function openAddRoomModal() {
-        addRoomForm.reset();
-        roomPaxCountInput.value = '';
-        
-        const unassigned = getUnassignedPassengers();
-        availablePassengersList.innerHTML = '';
-        
-        if (unassigned.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
-        } else if (selectedPassengers.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
-        } else {
-            unassigned.forEach(p => {
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.name = 'passengerId';
-                checkbox.value = p.id;
-                checkbox.setAttribute('data-name', p.nome);
-                
-                const label = document.createElement('label');
-                label.style.display = 'block';
-                label.appendChild(checkbox);
-                label.append(` ${p.nome} (CPF: ${p.cpf})`);
-                
-                availablePassengersList.appendChild(label);
-            });
-        }
-        
-        addRoomModal.style.display = 'block';
-    }
-
-    // Envio do Formulário do Quarto
     addRoomForm.addEventListener('submit', (e) => {
         e.preventDefault();
         
@@ -642,29 +617,26 @@
             return;
         }
         
-        // 1. Adiciona o novo quarto
         roomAssignments.push({
             id: nextRoomNumber++, 
             type: type,
             passengers: selectedPassengersData
         });
 
-        // 2. Fecha o modal e atualiza a exibição
         addRoomModal.style.display = 'none';
         renderAssignedRoomsDisplay();
-        
-        // 3. Atualiza a lista principal (em caso de remoção de passageiros)
         updateSelectedListDisplay(); 
     });
 
 
     // ----------------------------------------------------
-    // LÓGICA DE GERAÇÃO DOS 3 ARQUIVOS
+    // LÓGICA DE GERAÇÃO DOS ARQUIVOS (FINALIZAR LISTA)
     // ----------------------------------------------------
 
     finishListBtn.addEventListener('click', function() {
         const destinationInput = document.getElementById('tripDestination');
         const destination = destinationInput.value.trim();
+        // ... (resto das verificações e XLSX/PDF Completo/PDF Simples)
 
         if (!destination) {
             alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
@@ -733,7 +705,7 @@
                 0: { cellWidth: 45 }, 
                 1: { cellWidth: 30, halign: 'center' }, 
                 2: { cellWidth: 35, halign: 'center' }, 
-                3: { cellWidth: 140, halign: 'center' }, 
+                3: { cellWidth: 100, halign: 'center' }, 
                 4: { cellWidth: 30, halign: 'center' }
             },
             startY: 20,
@@ -776,13 +748,12 @@
 
         docSimples.save(`${baseFileName}_ONIBUS.pdf`);
 
-
         alert(`Três arquivos gerados com sucesso:\n- ${baseFileName}_ONIBUS.pdf\n- ${baseFileName}_COMPLETO.pdf\n- ${baseFileName}_COMPLETO.xlsx`);
     });
 
 
     // ----------------------------------------------------
-    // LÓGICA DE GERAÇÃO DO ROOMLIST PDF (NOVO BOTÃO)
+    // LÓGICA DE GERAÇÃO DO ROOMLIST PDF (BOTÃO DEDICADO)
     // ----------------------------------------------------
 
     generateRoomListBtn.addEventListener('click', function() {
@@ -873,7 +844,7 @@
     // INICIALIZAÇÃO
     // ----------------------------------------------------
 
-    loadAllPassengers().then(updateSelectedListDisplay);
+    loadAllPassengers().then(updateSelectedListDisplay); 
 </script>
 
 </body>
