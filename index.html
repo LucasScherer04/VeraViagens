@@ -880,7 +880,7 @@
                 body: finalTableData, 
                 startY: finalY + 2, 
                 theme: 'grid', 
-                margin: { left: 10, right: 10 }, 
+                margin: { top: 10, left: 10, right: 10 },
                 styles: { 
                     fontSize: 9, 
                     cellPadding: 2, 
@@ -906,7 +906,6 @@
                 didDrawPage: (data) => {
                     finalY = data.cursor.y;
                 }
-                margin: { top: 10, left: 10, right: 10 }
             });
 
             // Atualiza a posição Y global
