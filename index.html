@@ -77,21 +77,54 @@
         <div id="selectedPassengers">
             <p id="emptyListMsg">Nenhuma pessoa selecionada.</p>
         </div>
-        <hr>
+       <hr>
 
-        <div id="roomlist-area" style="margin-top: 30px; padding: 20px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
-            <h2>Atribuição de Quartos (Room List)</h2>
+        <div id="roomlist-management" style="margin-top: 30px; padding: 20px; border: 1px solid #1e88e5; border-radius: 5px; background-color: #f9f9f9;">
+            <h2>2. Gestão de Quartos (Room List)</h2>
             
-            <div id="roomListAssignmentsDiv">
-                <p>Selecione passageiros na lista acima para começar a atribuir quartos.</p>
+            <button id="addRoomBtn" style="background-color: #f39c12; color: white; padding: 10px 15px; border-radius: 4px; font-weight: bold; margin-bottom: 15px;">
+                + Adicionar Novo Quarto
+            </button>
+            
+            <div id="assignedRoomsDisplay">
+                <p>Nenhum quarto atribuído. Use o botão acima para começar.</p>
             </div>
 
-            <button id="generateRoomListBtn" style="margin-top: 15px; padding: 10px 20px; font-size: 16px; background-color: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            <button id="generateRoomListBtn" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 Gerar Room List PDF
             </button>
         </div>
 
         <hr>
+
+        <div id="addRoomModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <span class="close-room-btn">&times;</span>
+                <h2>Adicionar/Configurar Quarto</h2>
+
+                <form id="addRoomForm">
+                    <label for="roomType">Tipo de Quarto Solicitado:</label>
+                    <select id="roomType" required style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">-- Selecione o Tipo --</option>
+                        <option value="Individual">Individual (1 Pax)</option>
+                        <option value="Casal">Casal (2 Pax)</option>
+                        <option value="Duplo">Duplo (2 Pax)</option>
+                        <option value="Triplo">Triplo (3 Pax)</option>
+                        <option value="Quadruplo">Quádruplo (4 Pax)</option>
+                    </select>
+                    
+                    <label for="roomPaxCount">Quantidade de Passageiros Requerida:</label>
+                    <input type="number" id="roomPaxCount" min="1" required disabled title="Selecionado automaticamente com base no tipo de quarto."><br>
+
+                    <label>Passageiros (Selecione até o limite):</label>
+                    <div id="availablePassengersList" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px;">
+                        <p>Nenhum passageiro disponível. Adicione-os à lista principal.</p>
+                    </div>
+
+                    <button type="submit" style="background-color: #f39c12; margin-top: 20px;">Atribuir Quarto</button>
+                </form>
+            </div>
+        </div>
     </div>
     
     <hr>
@@ -182,15 +215,8 @@
 
     let database = []; // Banco de dados em memória (cópia do Supabase)
     let selectedPassengers = []; // Lista de passageiros para exportar
-    let roomAssignments = new Map(); // Mapa para guardar a atribuição de quarto: Map<passengerId, roomType>
-
-    const roomTypes = [
-        'Individual', 
-        'Casal', 
-        'Duplo', 
-        'Triplo', 
-        'Quádruplo'
-    ];
+    let roomAssignments = []; // Array de objetos: [{ type: 'Casal', passengers: [p1, p2] }, ...]
+    let nextRoomNumber = 1; // Contador para numerar os quartos no PDF
 
     const searchInput = document.getElementById('searchInput');
     const searchResultsDiv = document.getElementById('searchResults');
@@ -201,6 +227,117 @@
     
     const modal = document.getElementById('addPersonModal');
     const form = document.getElementById('addPersonForm');
+
+    // --- NOVAS REFERÊNCIAS ---
+    const addRoomBtn = document.getElementById('addRoomBtn');
+    const addRoomModal = document.getElementById('addRoomModal');
+    const closeRoomBtn = document.getElementsByClassName('close-room-btn')[0];
+    const roomTypeSelect = document.getElementById('roomType');
+    const roomPaxCountInput = document.getElementById('roomPaxCount');
+    const availablePassengersList = document.getElementById('availablePassengersList');
+    const addRoomForm = document.getElementById('addRoomForm');
+
+    const roomCapacityMap = {
+        'Individual': 1,
+        'Casal': 2,
+        'Duplo': 2,
+        'Triplo': 3,
+        'Quadruplo': 4
+    };
+
+    // --- ABRIR MODAL ---
+    addRoomBtn.addEventListener('click', () => {
+        openAddRoomModal();
+    });
+
+    closeRoomBtn.addEventListener('click', () => {
+        addRoomModal.style.display = 'none';
+    });
+    // Listener para Tipo de Quarto (Atualiza a contagem)
+roomTypeSelect.addEventListener('change', (e) => {
+    const type = e.target.value;
+    const capacity = roomCapacityMap[type] || 0;
+    
+    roomPaxCountInput.value = capacity;
+    roomPaxCountInput.disabled = true; // Mantém desabilitado para garantir o controle
+});
+
+    // Envio do Formulário do Quarto
+    addRoomForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const type = roomTypeSelect.value;
+        const requiredPax = parseInt(roomPaxCountInput.value);
+        
+        // Pega todos os checkboxes marcados
+        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
+        const selectedPassengersData = checkedBoxes.map(box => 
+            selectedPassengers.find(p => p.id === parseInt(box.value))
+        );
+        
+        if (selectedPassengersData.length === 0) {
+            alert('Selecione pelo menos um passageiro.');
+            return;
+        }
+        
+        if (selectedPassengersData.length !== requiredPax) {
+            alert(`O quarto '${type}' requer ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
+            return;
+        }
+        
+        // 1. Adiciona o novo quarto
+        roomAssignments.push({
+            id: nextRoomNumber++, // Atribui um ID de quarto único
+            type: type,
+            passengers: selectedPassengersData
+        });
+
+        // 2. Fecha o modal e atualiza a exibição
+        addRoomModal.style.display = 'none';
+        renderAssignedRoomsDisplay();
+        
+        // 3. Atualiza a lista principal (em caso de remoção de passageiros)
+        updateSelectedListDisplay(); 
+    });
+
+    function getUnassignedPassengers() {
+        // 1. Pegar IDs de passageiros que JÁ ESTÃO em algum quarto
+        const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
+        
+        // 2. Filtrar a lista principal para incluir apenas quem NÃO está atribuído
+        return selectedPassengers.filter(p => !assignedIds.has(p.id));
+    }
+
+    function openAddRoomModal() {
+        // Reseta o formulário
+        addRoomForm.reset();
+        roomPaxCountInput.value = '';
+        
+        const unassigned = getUnassignedPassengers();
+        availablePassengersList.innerHTML = '';
+        
+        if (unassigned.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
+            return;
+        }
+        
+        unassigned.forEach(p => {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'passengerId';
+            checkbox.value = p.id;
+            checkbox.setAttribute('data-name', p.nome); // Guarda o nome para fácil acesso
+            
+            const label = document.createElement('label');
+            label.style.display = 'block';
+            label.appendChild(checkbox);
+            label.append(` ${p.nome} (CPF: ${p.cpf})`);
+            
+            availablePassengersList.appendChild(label);
+        });
+        
+        addRoomModal.style.display = 'block';
+    }
 
 
     // ----------------------------------------------------
@@ -398,6 +535,47 @@
             });
         }
     });
+    function renderAssignedRoomsDisplay() {
+        const displayDiv = document.getElementById('assignedRoomsDisplay');
+        
+        if (roomAssignments.length === 0) {
+            displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
+            return;
+        }
+        
+        let html = '<h4>Quartos Atribuídos:</h4>';
+        html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+        html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
+        
+        roomAssignments.forEach(room => {
+            const passengerNames = room.passengers.map(p => p.nome).join(', ');
+            
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="font-weight: bold;">${room.id}</td>
+                    <td>${room.type}</td>
+                    <td>${passengerNames}</td>
+                    <td>
+                        <button onclick="removeRoom(${room.id})" style="background-color: #dc3545; color: white; padding: 3px 8px; border: none; border-radius: 3px;">Remover</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        displayDiv.innerHTML = html;
+    }
+
+    window.removeRoom = function(roomId) {
+        if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
+            // Remove o quarto do array
+            roomAssignments = roomAssignments.filter(room => room.id !== roomId);
+            
+            // Atualiza as exibições
+            renderAssignedRoomsDisplay();
+            updateSelectedListDisplay();
+        }
+    };
 
     // ----------------------------------------------------
     // LÓGICA DO MODAL E FORMULÁRIO
@@ -653,10 +831,10 @@
 
         docSimples.save(`${baseFileName}_ONIBUS.pdf`);
     });
-    
-    const roomListBtn = document.getElementById('generateRoomListBtn');
 
-    roomListBtn.addEventListener('click', function() {
+   const generateRoomListBtn = document.getElementById('generateRoomListBtn');
+
+    generateRoomListBtn.addEventListener('click', function() {
         const destinationInput = document.getElementById('tripDestination');
         const destination = destinationInput.value.trim();
 
@@ -665,18 +843,10 @@
             destinationInput.focus();
             return;
         }
-
-        if (selectedPassengers.length === 0) {
-            alert('Nenhum passageiro selecionado para gerar a Lista de Quartos.');
+        
+        if (roomAssignments.length === 0) {
+            alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o PDF.');
             return;
-        }
-
-        // Verifica se todos os passageiros têm um quarto atribuído
-        const unassignedCount = selectedPassengers.filter(p => !roomAssignments.has(p.id)).length;
-        if (unassignedCount > 0) {
-            if (!confirm(`Atenção: ${unassignedCount} passageiro(s) ainda não tem quarto atribuído. Deseja gerar o PDF assim mesmo?`)) {
-                return;
-            }
         }
 
         const { jsPDF } = window.jspdf;
@@ -685,39 +855,64 @@
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
         
         const headersRoomList = [
+            { header: 'QUARTO', dataKey: 'quarto' },
             { header: 'NOME', dataKey: 'nome' },
             { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
-            { header: 'CPF', dataKey: 'cpf' },
-            { header: 'QUARTO ATRIBUÍDO', dataKey: 'quarto' }
+            { header: 'CPF', dataKey: 'cpf' }
         ];
 
-        // Converte e formata os dados para o PDF
-        const dataPDFRoomList = selectedPassengers.map(person => ({
-            nome: person.nome,
-            data_nascimento: formatDateToBrazilian(person.data_nascimento),
-            cpf: person.cpf,
-            quarto: roomAssignments.get(person.id) || 'NÃO ATRIBUÍDO'
-        }));
-        
+        let finalTableData = [];
+
+        // Prepara os dados, agrupando por quarto e adicionando a linha do título do quarto
+        roomAssignments.forEach(room => {
+            // Linha de Cabeçalho do Quarto
+            finalTableData.push({
+                quarto: `QUARTO ${room.id} (${room.type.toUpperCase()})`,
+                nome: '',
+                data_nascimento: '',
+                cpf: ''
+            });
+            
+            // Linhas dos Passageiros
+            room.passengers.forEach(person => {
+                finalTableData.push({
+                    quarto: '',
+                    nome: person.nome,
+                    data_nascimento: formatDateToBrazilian(person.data_nascimento),
+                    cpf: person.cpf
+                });
+            });
+        });
+
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
 
         docRoomList.autoTable({
             head: [headersRoomList.map(h => h.header)],
-            body: dataPDFRoomList.map(obj => Object.values(obj)),
+            body: finalTableData.map(obj => Object.values(obj)),
             
             // Estilos
-            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 }, // Azul mais forte para destaque
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [100, 150, 200], textColor: 255 },
             bodyStyles: { fontSize: 9, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
             
-            // Largura das Colunas (A4 Retrato)
+            // Estilos para as linhas do corpo (aplica negrito e cor de fundo apenas ao título do quarto)
+            didParseCell: (data) => {
+                const rowData = finalTableData[data.row.index];
+                if (rowData && rowData.quarto.startsWith('QUARTO ')) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [220, 220, 220]; // Cor de fundo mais clara para o título do quarto
+                    data.cell.styles.halign = 'left';
+                }
+            },
+            
+            // Largura das Colunas
             columnStyles: {
-                0: { cellWidth: 50 }, // NOME
-                1: { cellWidth: 35, halign: 'center' }, // DATA DE NASCIMENTO
-                2: { cellWidth: 35, halign: 'center' }, // CPF
-                3: { cellWidth: 40, halign: 'center', fontStyle: 'bold' } // QUARTO (com destaque)
+                0: { cellWidth: 40, halign: 'left' }, // QUARTO
+                1: { cellWidth: 60, halign: 'left' }, // NOME
+                2: { cellWidth: 30, halign: 'center' }, // DATA DE NASCIMENTO
+                3: { cellWidth: 35, halign: 'center' } // CPF
             },
             startY: 20,
-            margin: { top: 10, left: 15, right: 15 }
+            margin: { top: 10, left: 10, right: 10 }
         });
 
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
