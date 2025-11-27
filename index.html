@@ -259,8 +259,8 @@
         'Triplo': 3, 'Quadruplo': 4
     };
     
-    // ⭐ MANTENDO O MARCADOR PARA TELA/EXCEL APENAS VISUALMENTE
-    const DRIVER_MARKER = '>>'; 
+    // ⭐ MANTENDO O MARCADOR PARA TELA/EXCEL
+    const DRIVER_MARKER = '*'; 
 
     // --- REFERÊNCIAS DOM ---
     const searchInput = document.getElementById('searchInput');
@@ -626,7 +626,8 @@
                 itemDiv.appendChild(checkbox);
                 itemDiv.appendChild(labelText);
                 
-                availablePassengersList.appendChild(itemDiv);
+                // ⭐ CORREÇÃO DE SEGURANÇA: Anexa o itemDiv ao invés do label
+                availablePassengersList.appendChild(itemDiv); 
             });
 
             const checkboxes = availablePassengersList.querySelectorAll('input[name="passengerId"]');
@@ -766,9 +767,138 @@
     // ----------------------------------------------------
     // LÓGICA DE MODAIS E EVENT LISTENERS
     // ----------------------------------------------------
-    // (Mantido igual)
-    // ...
-    // Botão Limpar Backups
+
+    // Modal Adicionar Pessoa
+    document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
+    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        const newPersonData = {
+            nome: document.getElementById('nome').value,
+            cpf: document.getElementById('cpf').value,
+            data_nascimento: document.getElementById('nascimento').value,
+            rua: document.getElementById('rua').value,
+            numero: document.getElementById('numero').value,
+            cidade: document.getElementById('cidade').value,
+            cep: document.getElementById('cep').value,
+            telefone: document.getElementById('telefone').value,
+        };
+        const savedPerson = await saveNewPerson(newPersonData);
+        if (savedPerson) {
+            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
+            window.addPassengerToList(savedPerson); 
+            form.reset();
+            modal.style.display = 'none';
+        }
+    });
+
+    // Modal Editar Pessoa
+    window.openEditModal = function(id) {
+        const personToEdit = database.find(p => p.id === id);
+        if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
+
+        document.getElementById('edit-id').value = personToEdit.id;
+        document.getElementById('edit-nome').value = personToEdit.nome;
+        document.getElementById('edit-cpf').value = personToEdit.cpf;
+        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
+        document.getElementById('edit-rua').value = personToEdit.rua || '';
+        document.getElementById('edit-numero').value = personToEdit.numero || '';
+        document.getElementById('edit-cidade').value = personToEdit.cidade || '';
+        document.getElementById('edit-cep').value = personToEdit.cep || '';
+        document.getElementById('edit-telefone').value = personToEdit.telefone;
+
+        editModal.style.display = 'block';
+    };
+
+    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
+
+    editForm.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        const id = parseInt(document.getElementById('edit-id').value);
+        const updatedData = {
+            nome: document.getElementById('edit-nome').value,
+            cpf: document.getElementById('edit-cpf').value,
+            data_nascimento: document.getElementById('edit-nascimento').value,
+            rua: document.getElementById('edit-rua').value,
+            numero: document.getElementById('edit-numero').value,
+            cidade: document.getElementById('edit-cidade').value,
+            cep: document.getElementById('edit-cep').value,
+            telefone: document.getElementById('edit-telefone').value,
+        };
+        const savedPerson = await updateExistingPerson(updatedData, id);
+        if (savedPerson) {
+            const dbIndex = database.findIndex(p => p.id === id);
+            if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
+            const selIndex = selectedPassengers.findIndex(p => p.id === id);
+            if (selIndex !== -1) { 
+                selectedPassengers[selIndex] = savedPerson; 
+                roomAssignments.forEach(room => {
+                    const paxInRoomIndex = room.passengers.findIndex(p => p.id === id);
+                    if (paxInRoomIndex !== -1) {
+                        room.passengers[paxInRoomIndex] = savedPerson;
+                    }
+                });
+            }
+
+            updateSelectedListDisplay();
+            editModal.style.display = 'none';
+        }
+    });
+
+
+    // Modal Adicionar Quarto
+    addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
+    closeRoomBtn.addEventListener('click', () => { addRoomModal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
+
+    roomTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        const capacity = roomCapacityMap[type] || 0;
+        roomPaxCountInput.value = capacity;
+        roomPaxCountInput.disabled = true;
+        checkRoomCapacityLimit(); 
+    });
+
+    addRoomForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const type = roomTypeSelect.value;
+        const requiredPax = parseInt(roomPaxCountInput.value);
+        
+        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
+        
+        const selectedPeopleData = checkedBoxes.map(box => {
+            const id = parseInt(box.value);
+            let person = selectedPassengers.find(p => p.id === id);
+            if (!person) {
+                person = currentDrivers.find(d => d.id === id);
+            }
+            return person;
+        }).filter(p => p !== undefined);
+        
+        if (selectedPeopleData.length === 0) {
+            alert('Selecione pelo menos uma pessoa.');
+            return;
+        }
+        
+        if (selectedPeopleData.length !== requiredPax) {
+            alert(`Erro: O quarto '${type}' requer EXATAMENTE ${requiredPax} pessoa(s). Você selecionou ${selectedPeopleData.length}.`);
+            return;
+        }
+        
+        roomAssignments.push({
+            id: nextRoomNumber++, 
+            type: type,
+            passengers: selectedPeopleData
+        });
+
+        addRoomModal.style.display = 'none';
+        renderAssignedRoomsDisplay();
+        updateSelectedListDisplay(); 
+        updateDriverStatusDisplay();
+    });
+    
     clearBackupsBtn.addEventListener('click', window.clearAllBackups);
 
 
@@ -808,7 +938,7 @@
         ]));
         dataForSheet.unshift(headersXLSX);
         const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
-        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
+        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } };
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista Completa');
         XLSX.writeFile(workbook, `${baseFileName}_COMPLETO.xlsx`);
@@ -934,7 +1064,7 @@
                     const row = [
                         paxIndex === 0 ? roomCounterXLSX : '', 
                         paxIndex === 0 ? room.type : '',       
-                        // ⭐ APENAS PARA EXCEL/TELA, USA O MARCADOR
+                        // USA O MARCADOR AQUI (EXCEL)
                         person.isDriver ? `${DRIVER_MARKER} ${person.nome}` : person.nome,
                         cpf,
                         nascimento
@@ -1003,7 +1133,7 @@
                     
                     const roomDisplay = isFirstInRoom ? roomCounterPDF.toString() : '';
                     
-                    // ⭐ CORREÇÃO AQUI: NOME PURO, SEM MARCADOR
+                    // NOME PURO, SEM MARCADOR
                     const nomeDisplay = person.nome; 
                     
                     const cpf = person.isDriver ? '' : person.cpf;
@@ -1072,7 +1202,7 @@
                                 data.cell.styles.fillColor = [240, 245, 255]; 
                             }
                             
-                            // ⭐ CORREÇÃO DE FONTE: Apenas a coluna do QUARTO é negrito e maior
+                            // Apenas a coluna do QUARTO é negrito e maior
                             if (data.column.index === 0) {
                                 data.cell.styles.fontStyle = 'bold';
                                 data.cell.styles.fontSize = 12;
