@@ -259,8 +259,8 @@
         'Triplo': 3, 'Quadruplo': 4
     };
     
-    // ⭐ MANTENDO O MARCADOR PARA TELA/EXCEL
-    const DRIVER_MARKER = '*'; 
+    // ⭐ MARCADOR PARA TELA/EXCEL
+    const DRIVER_MARKER = '>>'; 
 
     // --- REFERÊNCIAS DOM ---
     const searchInput = document.getElementById('searchInput');
@@ -626,7 +626,6 @@
                 itemDiv.appendChild(checkbox);
                 itemDiv.appendChild(labelText);
                 
-                // ⭐ CORREÇÃO DE SEGURANÇA: Anexa o itemDiv ao invés do label
                 availablePassengersList.appendChild(itemDiv); 
             });
 
@@ -728,6 +727,7 @@
         searchInput.dispatchEvent(new Event('input')); 
     }
     
+    // ⭐ CORREÇÃO DE PESQUISA: Atribui o listener no JS para evitar problemas de parsing do JSON
     searchInput.addEventListener('input', function() {
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; 
@@ -752,12 +752,20 @@
                 const resultDiv = document.createElement('div');
                 resultDiv.className = 'list-item';
                 
-                const personJsonSafe = JSON.stringify(person).replace(/"/g, '&quot;'); 
+                const addButton = document.createElement('button');
+                addButton.textContent = 'Adicionar';
+                addButton.style.cssText = "background-color: #6c757d; padding: 5px 10px;";
+                
+                // Anexa o evento usando closure para passar o objeto 'person'
+                addButton.addEventListener('click', () => {
+                    window.addPassengerToList(person);
+                });
 
-                resultDiv.innerHTML = `
-                    <span>${person.nome} (${person.cpf})</span>
-                    <button onclick='addPassengerToList(${personJsonSafe})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
-                `;
+                const personInfo = document.createElement('span');
+                personInfo.textContent = `${person.nome} (${person.cpf})`;
+
+                resultDiv.appendChild(personInfo);
+                resultDiv.appendChild(addButton);
                 searchResultsDiv.appendChild(resultDiv);
             });
         }
@@ -768,7 +776,7 @@
     // LÓGICA DE MODAIS E EVENT LISTENERS
     // ----------------------------------------------------
 
-    // Modal Adicionar Pessoa
+    // Modal Adicionar Pessoa (mantido)
     document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
     closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
     window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
@@ -793,7 +801,7 @@
         }
     });
 
-    // Modal Editar Pessoa
+    // Modal Editar Pessoa (mantido)
     window.openEditModal = function(id) {
         const personToEdit = database.find(p => p.id === id);
         if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
@@ -847,7 +855,7 @@
     });
 
 
-    // Modal Adicionar Quarto
+    // Modal Adicionar Quarto (mantido)
     addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
     closeRoomBtn.addEventListener('click', () => { addRoomModal.style.display = 'none'; });
     window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
@@ -938,7 +946,7 @@
         ]));
         dataForSheet.unshift(headersXLSX);
         const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
-        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } };
+        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista Completa');
         XLSX.writeFile(workbook, `${baseFileName}_COMPLETO.xlsx`);
@@ -1064,8 +1072,8 @@
                     const row = [
                         paxIndex === 0 ? roomCounterXLSX : '', 
                         paxIndex === 0 ? room.type : '',       
-                        // USA O MARCADOR AQUI (EXCEL)
-                        person.isDriver ? `${DRIVER_MARKER} ${person.nome}` : person.nome,
+                        // NOME LIMPO PARA EXCEL
+                        person.nome,
                         cpf,
                         nascimento
                     ];
