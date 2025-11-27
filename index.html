@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vera Viagens</title>
+    <title>Vera Viagens - Lista de Passageiros e Roomlist</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -14,28 +14,27 @@
         body { font-family: sans-serif; margin: 20px; background-color: #f0f2f5; }
         .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         h1, h2 { color: #1e88e5; }
-        /* --- NOVOS ESTILOS PARA A LOGO --- */
         .header-container {
-            display: flex;             /* Usa flexbox para alinhar itens lado a lado */
-            justify-content: space-between; /* Espaço máximo entre o título e a logo */
-            align-items: center;       /* Centraliza verticalmente */
-            border-bottom: 2px solid #1e88e5; /* Mantém a linha de baixo do h1 original */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #1e88e5;
             padding-bottom: 10px;
             margin-bottom: 20px;
         }
 
         .header-container h1 {
             color: #1e88e5;
-            border-bottom: none; /* Remove a borda de baixo do h1 para que fique apenas no container */
+            border-bottom: none;
             padding-bottom: 0;
         }
 
         .site-logo {
-            max-height: 80px; /* Define um tamanho máximo para a altura da logo */
-            width: auto;     /* Mantém a proporção */
+            max-height: 80px;
+            width: auto;
         }
-        input[type="text"], input[type="date"] { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-top: 10px; }
+        input[type="text"], input[type="date"], select, input[type="number"] { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; border: none; border-radius: 4 कुत्तों; cursor: pointer; color: white; margin-top: 10px; }
         #addPersonBtn { background-color: #4caf50; }
         #finishListBtn { background-color: #1e88e5; }
         .search-area, .person-list { margin-top: 20px; padding: 15px; border: 1px dashed #ccc; border-radius: 4px; }
@@ -44,6 +43,14 @@
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px; }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
         .close-btn:hover { color: black; text-decoration: none; cursor: pointer; }
+        /* Novos estilos para o contador e backups */
+        #passengerCountDisplay { font-size: 1.1em; font-weight: bold; color: #dc3545; margin-left: 10px; }
+        .available-passenger-item { display: flex; align-items: center; padding: 4px 0; cursor: pointer; transition: background-color 0.2s; }
+        .available-passenger-item:hover { background-color: #f0f0f0; }
+        .available-passenger-item input[type="checkbox"] { width: auto; margin-right: 10px; }
+        .available-passenger-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        .backup-area { margin-top: 20px; padding: 15px; border: 1px solid #1e88e5; border-radius: 4px; background-color: #e3f2fd; }
+        .backup-btn { background-color: #1e88e5; margin-right: 10px; margin-bottom: 5px; padding: 8px 12px; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -53,11 +60,21 @@
         <h1>Vera Viagens - Lista de Passageiros</h1>
         <img src="logo.png" alt="Logo da Vera Viagens" class="site-logo">
     </div>
-    <button id="addPersonBtn">Adicionar Nova Pessoa</button>
+    <button id="addPersonBtn">Adicionar Novo Passageiro</button>
     <hr>
 
+    <div class="backup-area">
+        <h2>Listas Anteriores (Backup Local)</h2>
+        <p style="margin-top: 0;">Carregue uma lista para editá-la ou gerar novos documentos.</p>
+        <div id="backupButtons">
+            <p>Nenhum backup encontrado.</p>
+        </div>
+        <button id="clearBackupsBtn" style="background-color: #dc3545; padding: 5px 10px; font-size: 0.8em; margin-top: 10px;">Limpar Backups</button>
+    </div>
+    <hr>
+    
     <div class="search-area">
-        <h2>Pesquisar e Selecionar os Passageiros</h2>
+        <h2>1. Pesquisar e Selecionar os Passageiros</h2>
         <input type="text" id="searchInput" placeholder="Pesquisar por Nome ou CPF...">
         <p id="loadingMsg">Carregando passageiros...</p>
         <div id="searchResults">
@@ -68,8 +85,7 @@
     
 
     <div class="person-list">
-        <h2>Passageiros Selecionados</h2>
-        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
+        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0)</span></h2> <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
             <label for="tripDestination" style="font-weight: bold; display: block; margin-bottom: 5px;">Destino da Viagem (Nome do Arquivo):</label>
             <input type="text" id="tripDestination" placeholder="Ex: Piratuba outubro" required 
                 style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #aaa; border-radius: 4px;">
@@ -91,7 +107,7 @@
             </div>
 
             <button id="generateRoomListBtn" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Gerar Room List PDF
+                Gerar Room List PDF e XLSX
             </button>
         </div>
 
@@ -116,7 +132,7 @@
                     <label for="roomPaxCount">Quantidade de Passageiros Requerida:</label>
                     <input type="number" id="roomPaxCount" min="1" required disabled title="Selecionado automaticamente com base no tipo de quarto."><br>
 
-                    <label>Passageiros (Selecione até o limite):</label>
+                    <label>Passageiros (Selecione **exatamente** o número requerido):</label>
                     <div id="availablePassengersList" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px;">
                         <p>Nenhum passageiro disponível. Adicione-os à lista principal.</p>
                     </div>
@@ -129,7 +145,7 @@
     
     <hr>
 
-    <button id="finishListBtn" disabled>Finalizar Lista</button>
+    <button id="finishListBtn" disabled>Finalizar Lista (Gerar 3 Arquivos)</button>
 </div>
 
 
@@ -209,6 +225,7 @@
     // =======================================================
     const SUPABASE_URL = 'https://isaqewxleobxekoqwvag.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzYXFld3hsZW9ieGVrb3F3dmFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMDc1NjIsImV4cCI6MjA3NTY4MzU2Mn0.oHqrh58ZAWyuGLe65a-CTaomT8ZnxFSatmL1Ce64f4M'; 
+    const BACKUP_KEY = 'vera_viagens_list_backups'; // Chave para LocalStorage
     // =======================================================
     
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -231,6 +248,8 @@
     const emptyListMsg = document.getElementById('emptyListMsg');
     const finishListBtn = document.getElementById('finishListBtn');
     const loadingMsg = document.getElementById('loadingMsg');
+    const passengerCountDisplay = document.getElementById('passengerCountDisplay'); // 👈 MELHORIA 1
+    const tripDestinationInput = document.getElementById('tripDestination');
     
     // Modais e Formulários de Pessoa
     const modal = document.getElementById('addPersonModal');
@@ -251,11 +270,13 @@
     const generateRoomListBtn = document.getElementById('generateRoomListBtn');
     const assignedRoomsDisplay = document.getElementById('assignedRoomsDisplay'); 
 
-    const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+    // Referências do Backup
+    const backupButtonsDiv = document.getElementById('backupButtons');
+    const clearBackupsBtn = document.getElementById('clearBackupsBtn');
 
 
     // ----------------------------------------------------
-    // FUNÇÕES AUXILIARES DE FORMATAÇÃO (Tudo aqui para evitar ReferenceError)
+    // FUNÇÕES AUXILIARES DE FORMATAÇÃO
     // ----------------------------------------------------
 
     function formatDateToBrazilian(dateString) {
@@ -287,7 +308,7 @@
             .update(personData)
             .eq('id', id)
             .select();
-        // ... (resto da função)
+        
         if (error) {
             console.error('Erro ao atualizar:', error);
             alert(`Erro ao atualizar pessoa. Detalhe: ${error.message}`);
@@ -308,6 +329,7 @@
         }
 
         database = data;
+        loadingMsg.style.display = 'none'; 
     }
 
     async function saveNewPerson(personData) {
@@ -326,36 +348,108 @@
         database.push(newPerson);
         return newPerson;
     }
-    /**
-     * Renumera sequencialmente os quartos dentro de cada categoria (Individual, Casal, etc.)
-     * na estrutura roomAssignments, garantindo que não haja saltos.
-     * Deve ser chamada antes de atualizar a exibição da lista (updateSelectedListDisplay).
-     */
-    function renumberRooms() {
-        const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
-        
-        // Filtra e renumera o roomAssignments por tipo
-        roomTypes.forEach(type => {
-            // Encontra todos os quartos do tipo atual
-            const roomsOfType = roomAssignments.filter(room => room.type === type);
-            
-            // Renumera esses quartos sequencialmente (1, 2, 3...)
-            roomsOfType.forEach((room, index) => {
-                // Assume que existe uma propriedade para o número do quarto, se for usada em outro lugar
-                room.room_number = index + 1; 
-            });
-        });
-
-        // Filtra o roomAssignments para remover quaisquer quartos que acabaram vazios
-        // Embora a remoção de passageiros deva ser inteligente, isso garante a limpeza.
-        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
-
-        console.log("Quartos Renumerados:", roomAssignments);
-    }
 
 
     // ----------------------------------------------------
-    // LÓGICA DE GESTÃO DE QUARTOS (NOVAS FUNÇÕES)
+    // FUNÇÕES DE BACKUP (LOCALSTORAGE) 👈 MELHORIA 2
+    // ----------------------------------------------------
+
+    function loadBackups() {
+        try {
+            const backupsJson = localStorage.getItem(BACKUP_KEY);
+            return backupsJson ? JSON.parse(backupsJson) : [];
+        } catch (e) {
+            console.error("Erro ao carregar backups:", e);
+            return [];
+        }
+    }
+
+    function saveCurrentListAsBackup() {
+        const destination = tripDestinationInput.value.trim() || 'Lista Sem Nome';
+        const timestamp = new Date().toLocaleString('pt-BR');
+        
+        if (selectedPassengers.length === 0) return;
+
+        const newBackup = {
+            name: `${destination} (${selectedPassengers.length} pax)`,
+            timestamp: timestamp,
+            destination: destination,
+            selectedPassengers: selectedPassengers,
+            roomAssignments: roomAssignments
+        };
+
+        let backups = loadBackups();
+        
+        // Adiciona o novo backup no início da lista
+        backups.unshift(newBackup);
+        
+        // Mantém apenas os 3 backups mais recentes
+        if (backups.length > 3) {
+            backups = backups.slice(0, 3);
+        }
+
+        try {
+            localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+            renderBackupButtons(); // Atualiza os botões imediatamente
+        } catch (e) {
+            console.error("Erro ao salvar backup:", e);
+        }
+    }
+
+    window.loadBackup = function(index) {
+        if (!confirm('Tem certeza que deseja carregar este backup? A lista atual será perdida.')) {
+            return;
+        }
+
+        const backups = loadBackups();
+        const backupToLoad = backups[index];
+
+        if (backupToLoad) {
+            // Limpa a lista atual e carrega o backup
+            selectedPassengers = backupToLoad.selectedPassengers;
+            roomAssignments = backupToLoad.roomAssignments;
+            tripDestinationInput.value = backupToLoad.destination;
+
+            // Atualiza a interface
+            updateSelectedListDisplay();
+            alert(`Backup de "${backupToLoad.name}" carregado com sucesso!`);
+        } else {
+            alert('Backup não encontrado.');
+        }
+    }
+    
+    window.clearAllBackups = function() {
+        if (confirm('Tem certeza que deseja limpar TODOS os backups salvos localmente?')) {
+            localStorage.removeItem(BACKUP_KEY);
+            renderBackupButtons();
+            alert('Backups limpos com sucesso.');
+        }
+    }
+
+    function renderBackupButtons() {
+        const backups = loadBackups();
+        backupButtonsDiv.innerHTML = '';
+
+        if (backups.length === 0) {
+            backupButtonsDiv.innerHTML = '<p>Nenhum backup encontrado.</p>';
+            clearBackupsBtn.style.display = 'none';
+            return;
+        }
+
+        clearBackupsBtn.style.display = 'block';
+
+        backups.forEach((backup, index) => {
+            const button = document.createElement('button');
+            button.className = 'backup-btn';
+            button.style.backgroundColor = '#6c757d';
+            button.textContent = `${index + 1}. ${backup.name} (${backup.timestamp})`;
+            button.onclick = () => window.loadBackup(index);
+            backupButtonsDiv.appendChild(button);
+        });
+    }
+
+    // ----------------------------------------------------
+    // LÓGICA DE GESTÃO DE QUARTOS 
     // ----------------------------------------------------
     
     function getUnassignedPassengers() {
@@ -363,9 +457,14 @@
         return selectedPassengers.filter(p => !assignedIds.has(p.id));
     }
 
+    function renumberRooms() {
+        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
+    }
+    
     function renderAssignedRoomsDisplay() {
-        const displayDiv = assignedRoomsDisplay; // Usando a variável DOM
-        
+        const displayDiv = assignedRoomsDisplay; 
+        renumberRooms(); 
+
         if (roomAssignments.length === 0) {
             displayDiv.innerHTML = '<p>Nenhum quarto atribuído. Use o botão acima para começar.</p>';
             return;
@@ -375,21 +474,26 @@
         html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
         html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
         
-        // CORREÇÃO: Usamos 'index + 1' para o número sequencial de exibição
-        roomAssignments.forEach((room, index) => {
-            const sequentialNumber = index + 1;
-            const passengerNames = room.passengers.map(p => p.nome).join(', ');
+        const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+        let sequentialRoomNumber = 1;
+        
+        roomTypes.forEach(type => {
+            const roomsOfType = roomAssignments.filter(room => room.type === type);
             
-            html += `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="font-weight: bold;">${sequentialNumber}</td>
-                    <td>${room.type}</td>
-                    <td>${passengerNames}</td>
-                    <td>
-                        <button onclick="removeRoom(${room.id})" style="background-color: #dc3545; color: white; padding: 3px 8px; border: none; border-radius: 3px;">Remover</button>
-                    </td>
-                </tr>
-            `;
+            roomsOfType.forEach((room) => {
+                const passengerNames = room.passengers.map(p => p.nome).join(', ');
+                
+                html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="font-weight: bold;">${sequentialRoomNumber++}</td>
+                        <td>${room.type}</td>
+                        <td>${passengerNames}</td>
+                        <td>
+                            <button onclick="removeRoom(${room.id})" style="background-color: #dc3545; color: white; padding: 3px 8px; border: none; border-radius: 3px;">Remover</button>
+                        </td>
+                    </tr>
+                `;
+            });
         });
         
         html += '</tbody></table>';
@@ -397,18 +501,17 @@
     }
 
     window.removeRoom = function(roomId) {
-    if (confirm(`Tem certeza que deseja remover o Quarto ${roomId}? Os passageiros serão liberados para nova atribuição.`)) {
-        // Remove o quarto do array (usando o ID único para identificação)
-        roomAssignments = roomAssignments.filter(room => room.id !== roomId);
-        
-        renderAssignedRoomsDisplay(); 
-        updateSelectedListDisplay(); // Atualiza a lista principal (para liberar passageiros)
-    }
-};
+        if (confirm(`Tem certeza que deseja remover este quarto? Os passageiros serão liberados para nova atribuição.`)) {
+            roomAssignments = roomAssignments.filter(room => room.id !== roomId);
+            renderAssignedRoomsDisplay(); 
+            updateSelectedListDisplay(); 
+        }
+    };
 
     function openAddRoomModal() {
         addRoomForm.reset();
         roomPaxCountInput.value = '';
+        roomTypeSelect.value = '';
         
         const unassigned = getUnassignedPassengers();
         availablePassengersList.innerHTML = '';
@@ -419,30 +522,76 @@
             availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
         } else {
             unassigned.forEach(p => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'available-passenger-item';
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.name = 'passengerId';
                 checkbox.value = p.id;
                 checkbox.setAttribute('data-name', p.nome);
                 
-                const label = document.createElement('label');
-                label.style.display = 'block';
-                label.appendChild(checkbox);
-                label.append(` ${p.nome} (CPF: ${p.cpf})`);
+                const labelText = document.createElement('span');
+                labelText.textContent = `${p.nome} (CPF: ${p.cpf})`;
+
+                itemDiv.appendChild(checkbox);
+                itemDiv.appendChild(labelText);
                 
-                availablePassengersList.appendChild(label);
+                availablePassengersList.appendChild(itemDiv);
+            });
+
+            const checkboxes = availablePassengersList.querySelectorAll('input[name="passengerId"]');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', checkRoomCapacityLimit);
             });
         }
         
         addRoomModal.style.display = 'block';
     }
 
+    function checkRoomCapacityLimit() {
+        const requiredPax = parseInt(roomPaxCountInput.value) || 0;
+        const currentSelected = availablePassengersList.querySelectorAll('input[name="passengerId"]:checked').length;
+        const checkboxes = availablePassengersList.querySelectorAll('input[name="passengerId"]');
+
+        if (requiredPax === 0) return; 
+
+        checkboxes.forEach(cb => {
+            if (!cb.checked && currentSelected >= requiredPax) {
+                cb.disabled = true;
+                cb.closest('.available-passenger-item').classList.add('disabled');
+            } else {
+                cb.disabled = false;
+                cb.closest('.available-passenger-item').classList.remove('disabled');
+            }
+        });
+    }
+
+    window.removePassengerFromList = function(id) {
+        selectedPassengers = selectedPassengers.filter(person => person.id !== id);
+        
+        roomAssignments.forEach(room => {
+            room.passengers = room.passengers.filter(p => p.id !== id);
+        });
+        
+        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
+
+        updateSelectedListDisplay();
+        searchInput.dispatchEvent(new Event('input')); 
+    }
+
 
     // ----------------------------------------------------
     // LÓGICA DE PESQUISA, SELEÇÃO E EXIBIÇÃO
     // ----------------------------------------------------
+    
+    function updatePassengerCountDisplay() { // 👈 NOVO: MELHORIA 1
+        passengerCountDisplay.textContent = `(${selectedPassengers.length} pax)`;
+    }
 
     function updateSelectedListDisplay() {
+        updatePassengerCountDisplay(); // Atualiza o contador
+        
         selectedPassengersDiv.innerHTML = '';
         if (selectedPassengers.length === 0) {
             emptyListMsg.style.display = 'block';
@@ -455,17 +604,19 @@
                 const item = document.createElement('div');
                 item.className = 'list-item';
                 
-                // Botões de Ação
                 const actionButtons = document.createElement('span');
                 actionButtons.innerHTML = `
                     <button onclick="openEditModal(${person.id})" style="background-color: #f39c12; padding: 5px 10px; margin-right: 5px;">Editar</button>
                     <button onclick="removePassengerFromList(${person.id})" style="background-color: #dc3545; padding: 5px 10px;">Remover</button>
                 `;
 
+                const isAssigned = roomAssignments.some(room => room.passengers.some(p => p.id === person.id));
+                const assignmentStatus = isAssigned ? ' ✅ Quarto Atribuído' : ' ❌ Sem Quarto';
+
                 item.innerHTML = `
                     <span>
                         <input type="checkbox" checked disabled> 
-                        <strong>${person.nome}</strong> | CPF: ${person.cpf}
+                        <strong>${person.nome}</strong> | CPF: ${person.cpf} | <span style="font-size: 0.9em; font-weight: bold; color: ${isAssigned ? 'green' : 'red'};">${assignmentStatus}</span>
                     </span>
                 `;
                 item.appendChild(actionButtons); 
@@ -473,7 +624,6 @@
             });
         }
         
-        // NOVO: Atualiza a lista de quartos (necessário após qualquer mudança de seleção)
         renderAssignedRoomsDisplay(); 
     }
 
@@ -487,20 +637,6 @@
         searchInput.value = '';
         searchInput.dispatchEvent(new Event('input')); 
     }
-
-    window.removePassengerFromList = function(id) {
-        selectedPassengers = selectedPassengers.filter(person => person.id !== id);
-        
-        // NOVO: Remove o passageiro de qualquer quarto atribuído
-        roomAssignments.forEach(room => {
-            room.passengers = room.passengers.filter(p => p.id !== id);
-        });
-        // Remove quartos vazios
-        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
-
-        updateSelectedListDisplay();
-        searchInput.dispatchEvent(new Event('input')); 
-    }
     
     searchInput.addEventListener('input', function() {
         const searchTerm = searchInput.value.toLowerCase().trim();
@@ -512,472 +648,4 @@
         }
 
         const results = database.filter(person => {
-            const isSelected = selectedPassengers.some(p => p.id === person.id);
-            if (isSelected) return false; 
-            
-            return person.nome.toLowerCase().includes(searchTerm) || 
-                   person.cpf.toLowerCase().includes(searchTerm);
-        });
-
-        if (results.length === 0) {
-            searchResultsDiv.innerHTML = '<p>Nenhum resultado encontrado ou todos já selecionados.</p>';
-        } else {
-            results.forEach(person => {
-                const resultDiv = document.createElement('div');
-                resultDiv.className = 'list-item';
-                
-                const personJsonSafe = JSON.stringify(person).replace(/"/g, '&quot;'); 
-
-                resultDiv.innerHTML = `
-                    <span>${person.nome} (${person.cpf})</span>
-                    <button onclick='addPassengerToList(${personJsonSafe})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
-                `;
-                searchResultsDiv.appendChild(resultDiv);
-            });
-        }
-    });
-
-
-    // ----------------------------------------------------
-    // LÓGICA DE MODAIS E EVENT LISTENERS
-    // ----------------------------------------------------
-
-    // Modal Adicionar Pessoa
-    document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
-    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
-    window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
-
-    // Envio do Formulário Adicionar Pessoa
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-        const newPersonData = {
-            nome: document.getElementById('nome').value,
-            cpf: document.getElementById('cpf').value,
-            data_nascimento: document.getElementById('nascimento').value,
-            rua: document.getElementById('rua').value,
-            numero: document.getElementById('numero').value,
-            cidade: document.getElementById('cidade').value,
-            cep: document.getElementById('cep').value,
-            telefone: document.getElementById('telefone').value,
-        };
-        const savedPerson = await saveNewPerson(newPersonData);
-        if (savedPerson) {
-            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
-            window.addPassengerToList(savedPerson); 
-            form.reset();
-            modal.style.display = 'none';
-        }
-    });
-
-    // Modal Editar Pessoa
-    window.openEditModal = function(id) {
-        const personToEdit = database.find(p => p.id === id);
-        if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
-
-        document.getElementById('edit-id').value = personToEdit.id;
-        document.getElementById('edit-nome').value = personToEdit.nome;
-        document.getElementById('edit-cpf').value = personToEdit.cpf;
-        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
-        document.getElementById('edit-rua').value = personToEdit.rua || '';
-        document.getElementById('edit-numero').value = personToEdit.numero || '';
-        document.getElementById('edit-cidade').value = personToEdit.cidade || '';
-        document.getElementById('edit-cep').value = personToEdit.cep || '';
-        document.getElementById('edit-telefone').value = personToEdit.telefone;
-
-        editModal.style.display = 'block';
-    };
-
-    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
-
-    editForm.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-        const id = parseInt(document.getElementById('edit-id').value);
-        const updatedData = {
-            nome: document.getElementById('edit-nome').value,
-            cpf: document.getElementById('edit-cpf').value,
-            data_nascimento: document.getElementById('edit-nascimento').value,
-            rua: document.getElementById('edit-rua').value,
-            numero: document.getElementById('edit-numero').value,
-            cidade: document.getElementById('edit-cidade').value,
-            cep: document.getElementById('edit-cep').value,
-            telefone: document.getElementById('edit-telefone').value,
-        };
-        const savedPerson = await updateExistingPerson(updatedData, id);
-        if (savedPerson) {
-            const dbIndex = database.findIndex(p => p.id === id);
-            if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
-            const selIndex = selectedPassengers.findIndex(p => p.id === id);
-            if (selIndex !== -1) { selectedPassengers[selIndex] = savedPerson; }
-            updateSelectedListDisplay();
-            editModal.style.display = 'none';
-        }
-    });
-
-
-    // Modal Adicionar Quarto
-    addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
-    closeRoomBtn.addEventListener('click', () => { addRoomModal.style.display = 'none'; });
-    window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
-
-    roomTypeSelect.addEventListener('change', (e) => {
-        const type = e.target.value;
-        const capacity = roomCapacityMap[type] || 0;
-        roomPaxCountInput.value = capacity;
-        roomPaxCountInput.disabled = true;
-    });
-
-    addRoomForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        const type = roomTypeSelect.value;
-        const requiredPax = parseInt(roomPaxCountInput.value);
-        
-        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
-        const selectedPassengersData = checkedBoxes.map(box => 
-            selectedPassengers.find(p => p.id === parseInt(box.value))
-        );
-        
-        if (selectedPassengersData.length === 0) {
-            alert('Selecione pelo menos um passageiro.');
-            return;
-        }
-        
-        if (selectedPassengersData.length !== requiredPax) {
-            alert(`O quarto '${type}' requer ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
-            return;
-        }
-        
-        roomAssignments.push({
-            id: nextRoomNumber++, 
-            type: type,
-            passengers: selectedPassengersData
-        });
-
-        addRoomModal.style.display = 'none';
-        renderAssignedRoomsDisplay();
-        updateSelectedListDisplay(); 
-    });
-
-
-    // ----------------------------------------------------
-    // LÓGICA DE GERAÇÃO DOS ARQUIVOS (FINALIZAR LISTA)
-    // ----------------------------------------------------
-
-    finishListBtn.addEventListener('click', function() {
-        const destinationInput = document.getElementById('tripDestination');
-        const destination = destinationInput.value.trim();
-        // ... (resto das verificações e XLSX/PDF Completo/PDF Simples)
-
-        if (!destination) {
-            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
-            destinationInput.focus();
-            return;
-        }
-
-        if (selectedPassengers.length === 0) {
-            alert('A lista está vazia! Adicione passageiros para gerar os documentos.');
-            return;
-        }
-
-        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
-
-        // ----------------------------------------------------
-        // 1. GERAÇÃO DA LISTA COMPLETA (XLSX)
-        // ----------------------------------------------------
-        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
-        
-        const dataForSheet = selectedPassengers.map(person => ([
-            person.nome, 
-            person.cpf, 
-            formatDateToBrazilian(person.data_nascimento), 
-            formatAddress(person), 
-            person.telefone,
-        ]));
-        dataForSheet.unshift(headersXLSX);
-        
-        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
-        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
-        
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista Completa');
-        XLSX.writeFile(workbook, `${baseFileName}_COMPLETO.xlsx`);
-
-
-        // ----------------------------------------------------
-        // 2. GERAÇÃO DA LISTA COMPLETA (PDF PAISAGEM)
-        // ----------------------------------------------------
-        
-        const { jsPDF } = window.jspdf;
-        const docCompleto = new jsPDF('landscape', 'mm', 'a4'); 
-        
-        const headersCompleto = [
-            { header: 'NOME', dataKey: 'nome' },
-            { header: 'CPF', dataKey: 'cpf' },
-            { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
-            { header: 'ENDEREÇO', dataKey: 'endereco_completo' },
-            { header: 'TELEFONE', dataKey: 'telefone' }
-        ];
-
-        const dataPDFCompleto = selectedPassengers.map(person => ({
-            nome: person.nome,
-            cpf: person.cpf,
-            data_nascimento: formatDateToBrazilian(person.data_nascimento),
-            endereco_completo: formatAddress(person),
-            telefone: person.telefone
-        }));
-
-        docCompleto.autoTable({
-            head: [headersCompleto.map(h => h.header)],
-            body: dataPDFCompleto.map(obj => Object.values(obj)),
-            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
-            bodyStyles: { fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
-            columnStyles: {
-                0: { cellWidth: 45 }, 
-                1: { cellWidth: 30, halign: 'center' }, 
-                2: { cellWidth: 35, halign: 'center' }, 
-                3: { cellWidth: 140, halign: 'center' }, 
-                4: { cellWidth: 30, halign: 'center' }
-            },
-            startY: 20,
-            margin: { top: 10, left: 10, right: 10 }
-        });
-
-        docCompleto.save(`${baseFileName}_COMPLETO.pdf`);
-
-
-        // ----------------------------------------------------
-        // 3. GERAÇÃO DA LISTA SIMPLES (PDF RETRATO)
-        // ----------------------------------------------------
-
-        const docSimples = new jsPDF('portrait', 'mm', 'a4'); 
-
-        const headersSimples = [
-            { header: 'NOME', dataKey: 'nome' },
-            { header: 'CPF', dataKey: 'cpf' }
-        ];
-
-        const dataPDFSimples = selectedPassengers.map(person => ({
-            nome: person.nome,
-            cpf: person.cpf
-        }));
-
-        docSimples.autoTable({
-            head: [headersSimples.map(h => h.header)],
-            body: dataPDFSimples.map(obj => Object.values(obj)),
-            
-            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 10, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
-            bodyStyles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
-            
-            columnStyles: {
-                0: { cellWidth: 100 }, 
-                1: { cellWidth: 50, halign: 'center' } 
-            },
-            startY: 20,
-            margin: { top: 10, left: 30, right: 30 } 
-        });
-
-        docSimples.save(`${baseFileName}_ONIBUS.pdf`);
-
-        alert(`Três arquivos gerados com sucesso:\n- ${baseFileName}_ONIBUS.pdf\n- ${baseFileName}_COMPLETO.pdf\n- ${baseFileName}_COMPLETO.xlsx`);
-    });
-
-
-    // ----------------------------------------------------
-    // LÓGICA DE GERAÇÃO DO ROOMLIST PDF (BOTÃO DEDICADO)
-    // ----------------------------------------------------
-
-    generateRoomListBtn.addEventListener('click', function() {
-        const destinationInput = document.getElementById('tripDestination');
-        const destination = destinationInput.value.trim();
-
-        if (!destination) {
-            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
-            destinationInput.focus();
-            return;
-        }
-        
-        if (roomAssignments.length === 0) {
-            alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o PDF.');
-            return;
-        }
-
-        const { jsPDF } = window.jspdf;
-        const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
-        
-        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
-        
-        // ----------------------------------------------------
-        // 1. AGRUPAMENTO E DEFINIÇÕES INICIAIS
-        // ----------------------------------------------------
-        // --- 1. CONFIGURAÇÃO DO CABEÇALHO ---
-        const LOGO_WIDTH = 70; // Largura da logo em mm
-        const LOGO_HEIGHT = 20; // Altura da logo em mm
-        const PAGE_WIDTH = docRoomList.internal.pageSize.getWidth();
-
-        const CENTER_X = (PAGE_WIDTH / 2) - (LOGO_WIDTH / 2);
-
-        docRoomList.addImage("logo.png", "PNG", CENTER_X, 5, LOGO_WIDTH, LOGO_HEIGHT);
-
-        // Define o novo ponto de início Y (Abaixo do cabeçalho)
-        let finalY = 40; // 35mm do topo (dá espaço para a logo e o título)
-        let tableIndex = 0;
-
-        const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
-        
-        const roomsByType = roomAssignments.reduce((acc, room) => {
-            acc[room.type] = acc[room.type] || [];
-            acc[room.type].push(room);
-            return acc;
-        }, {});
-
-        // ----------------------------------------------------
-        // 2. GERAÇÃO DO PDF COM LINHAS ALTERNADAS POR CAPACIDADE
-        // ----------------------------------------------------
-
-        roomTypes.forEach((category) => {
-            const rooms = roomsByType[category] || [];
-
-            if (rooms.length === 0) return;
-
-            if (tableIndex > 0) {
-                finalY += 10; 
-            }
-
-            if (finalY + 20 > docRoomList.internal.pageSize.getHeight()) {
-                docRoomList.addPage();
-                finalY = 15;
-            }
-
-            // --- DESENHA O TÍTULO DA CATEGORIA (FORA DA TABELA) ---
-            docRoomList.setFontSize(18);
-            docRoomList.setFont(undefined, 'bold');
-            docRoomList.setTextColor(0, 0, 0); 
-            docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
-            finalY += 5; 
-            
-            
-            let finalTableData = [];
-            let roomColorData = []; // NOVO: Array para rastrear o estilo por linha
-            let roomCounter = 1;
-            
-            // Prepara os dados na estrutura de linhas
-            rooms.forEach(room => {
-                const roomCapacity = roomCapacityMap[room.type] || 1; // Capacidade (N)
-                
-                room.passengers.forEach((person, paxIndex) => {
-                    const isFirstInRoom = paxIndex === 0;
-                    
-                    // O número do quarto só aparece na primeira linha do grupo
-                    const roomDisplay = isFirstInRoom ? roomCounter.toString() : '';
-                    
-                    // Linhas dos Passageiros para a tabela
-                    const row = [
-                        roomDisplay, // QUARTO
-                        person.nome,
-                        formatDateToBrazilian(person.data_nascimento),
-                        person.cpf
-                    ];
-                    finalTableData.push(row);
-                    
-                    // Salva o metadado da linha para o hook de cor
-                    roomColorData.push({
-                        roomIndex: roomCounter,
-                        capacity: roomCapacity,
-                        // Usaremos o roomCounter para determinar se a cor é ON ou OFF
-                        // roomIndex % 2 !== 0 -> Cor AZUL
-                        // roomIndex % 2 === 0 -> Cor BRANCA
-                    });
-                });
-                roomCounter++;
-            });
-
-
-            // --- ESTRUTURA DE CABEÇALHO (APENAS 1 LINHA) ---
-            const headersCategory = [
-                ['QUARTO', 'NOME', 'DATA DE NASCIMENTO', 'CPF']
-            ];
-
-
-            // Gera a tabela para a categoria atual
-            docRoomList.autoTable({
-                head: headersCategory,
-                body: finalTableData, 
-                startY: finalY + 2, 
-                theme: 'grid', 
-                margin: { top: 10, left: 10, right: 10 },
-                styles: { 
-                    fontSize: 9, 
-                    cellPadding: 2, 
-                    textColor: [0, 0, 0]
-                }, 
-
-                headStyles: { 
-                    fontStyle: 'bold', 
-                    halign: 'center', 
-                    valign: 'middle', 
-                    fillColor: [60, 130, 200], 
-                    textColor: 255, 
-                },
-                
-                columnStyles: {
-                    0: { cellWidth: 25, halign: 'center' }, 
-                    1: { cellWidth: 85, halign: 'center' }, 
-                    2: { cellWidth: 50, halign: 'center' }, 
-                    3: { cellWidth: 30, halign: 'center' } 
-                },
-                
-                // NOVO HOOK: Para calcular e aplicar a cor da linha
-                didParseCell: (data) => {
-                    // Aplica a cor apenas nas linhas de dados (corpo)
-                    if (data.section === 'body') {
-                        const rowStyleData = roomColorData[data.row.index];
-                        
-                        if (rowStyleData) {
-                            const roomIndex = rowStyleData.roomIndex;
-                            
-                            // Alternância simples de cor por índice de quarto: 1=AZUL, 2=BRANCO, 3=AZUL...
-                            if (roomIndex % 2 !== 0) {
-                                data.cell.styles.fillColor = [255, 255, 255]; // Branco
-                                // Estilo especial para o número do quarto
-                                if (data.column.index === 0) {
-                                    data.cell.styles.fontStyle = 'bold';
-                                    data.cell.styles.fontSize = 12;
-                                }
-                            } else {
-                                data.cell.styles.fillColor = [240, 245, 255]; // Azul Claro Suave
-                                if (data.column.index === 0) {
-                                    data.cell.styles.fontStyle = 'bold';
-                                    data.cell.styles.fontSize = 12;
-                                }
-                            }
-                            
-                        }
-                    }
-                },
-                
-                didDrawPage: (data) => {
-                    finalY = data.cursor.y;
-                }
-            });
-
-            // Atualiza a posição Y global
-            const table = docRoomList.autoTable.previous;
-            finalY = table.finalY;
-            
-            tableIndex++; 
-        });
-
-        docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
-        alert(`Lista de Quartos gerada com sucesso: ${baseFileName}_ROOMLIST.pdf`);
-    });
-
-
-    // ----------------------------------------------------
-    // INICIALIZAÇÃO
-    // ----------------------------------------------------
-
-    loadAllPassengers().then(updateSelectedListDisplay); 
-</script>
-
-</body>
-</html>
+            const isSelected = selectedPassengers.some(p => p.id === person
