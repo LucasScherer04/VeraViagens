@@ -51,6 +51,10 @@
         .available-passenger-item.disabled { opacity: 0.5; cursor: not-allowed; }
         .backup-area { margin-top: 20px; padding: 15px; border: 1px solid #1e88e5; border-radius: 4px; background-color: #e3f2fd; }
         .backup-btn { background-color: #6c757d; margin-right: 10px; margin-bottom: 5px; padding: 8px 12px; font-size: 0.9em; }
+        
+        /* NOVO ESTILO PARA MOTORISTAS */
+        .driver-settings { padding: 15px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; background-color: #f9f9f9; }
+
     </style>
 </head>
 <body>
@@ -99,6 +103,18 @@
         <div id="roomlist-management" style="margin-top: 30px; padding: 20px; border: 1px solid #1e88e5; border-radius: 5px; background-color: #f9f9f9;">
             <h2>2. Gestão de Quartos (Room List)</h2>
             
+            <div class="driver-settings">
+                <label for="driverCount" style="font-weight: bold; display: block; margin-bottom: 5px;">Quantidade de Motoristas para o Room List:</label>
+                <select id="driverCount" style="width: auto; padding: 8px;">
+                    <option value="0">0 Motorista</option>
+                    <option value="1">1 Motorista</option>
+                    <option value="2">2 Motoristas</option>
+                </select>
+                <div id="driverStatusDisplay" style="margin-top: 10px; font-size: 0.9em;">
+                    Atribuir quartos aos motoristas abaixo.
+                </div>
+            </div>
+
             <button id="addRoomBtn" style="background-color: #f39c12; color: white; padding: 10px 15px; border-radius: 4px; font-weight: bold; margin-bottom: 15px;">
                 + Adicionar Novo Quarto
             </button>
@@ -133,7 +149,7 @@
                     <label for="roomPaxCount">Quantidade de Passageiros Requerida:</label>
                     <input type="number" id="roomPaxCount" min="1" required disabled title="Selecionado automaticamente com base no tipo de quarto."><br>
 
-                    <label>Passageiros (Selecione os passageiros):</label>
+                    <label>Pessoas (Selecione os passageiros):</label>
                     <div id="availablePassengersList" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px;">
                         <p>Nenhum passageiro disponível. Adicione-os à lista principal.</p>
                     </div>
@@ -236,6 +252,7 @@
     let selectedPassengers = []; 
     let roomAssignments = []; 
     let nextRoomNumber = 1; 
+    let currentDrivers = []; // NOVO: Armazena os objetos dos motoristas configurados
 
     const roomCapacityMap = {
         'Individual': 1, 'Casal': 2, 'Duplo': 2,
@@ -252,6 +269,10 @@
     const passengerCountDisplay = document.getElementById('passengerCountDisplay'); 
     const tripDestinationInput = document.getElementById('tripDestination');
     
+    // Motoristas DOM
+    const driverCountSelect = document.getElementById('driverCount'); // NOVO
+    const driverStatusDisplay = document.getElementById('driverStatusDisplay'); // NOVO
+
     // Modais e Formulários de Pessoa
     const modal = document.getElementById('addPersonModal');
     const form = document.getElementById('addPersonForm');
@@ -352,6 +373,62 @@
 
 
     // ----------------------------------------------------
+    // FUNÇÕES DE MOTORISTAS (NOVO)
+    // ----------------------------------------------------
+
+    function createDriverObjects(count) {
+        const drivers = [];
+        // Os IDs dos motoristas são números negativos para garantir que não colidam com os IDs do Supabase
+        for (let i = 1; i <= count; i++) {
+            const driverName = `Motorista ${i}`;
+            const driverId = -i; // IDs negativos para fácil identificação
+            
+            drivers.push({
+                id: driverId,
+                nome: driverName,
+                cpf: 'N/A',
+                isDriver: true, // Flag para identificar
+                // Dados em branco para as listas completas:
+                data_nascimento: '', rua: '', numero: '', cidade: '', cep: '', telefone: ''
+            });
+        }
+        currentDrivers = drivers;
+        updateDriverStatusDisplay();
+        return drivers;
+    }
+
+    function updateDriverStatusDisplay() {
+        const assignedDriverCount = currentDrivers.filter(driver => 
+            roomAssignments.some(room => room.passengers.some(p => p.id === driver.id))
+        ).length;
+
+        if (currentDrivers.length === 0) {
+            driverStatusDisplay.innerHTML = 'Motoristas não configurados.';
+        } else if (assignedDriverCount === currentDrivers.length) {
+            driverStatusDisplay.innerHTML = `<span style="color: green; font-weight: bold;">Todos os ${currentDrivers.length} motoristas foram atribuídos a um quarto.</span>`;
+        } else {
+            driverStatusDisplay.innerHTML = `<span style="color: orange; font-weight: bold;">${assignedDriverCount} de ${currentDrivers.length} motoristas atribuídos.</span>`;
+        }
+    }
+
+    driverCountSelect.addEventListener('change', (e) => {
+        const count = parseInt(e.target.value);
+        
+        // 1. Limpa atribuições de motoristas antigas
+        const driverIds = currentDrivers.map(d => d.id);
+        roomAssignments.forEach(room => {
+            room.passengers = room.passengers.filter(p => !driverIds.includes(p.id));
+        });
+        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
+        
+        // 2. Cria novos objetos de motorista
+        createDriverObjects(count);
+        
+        // 3. Atualiza o display geral (para que o status do quarto seja atualizado)
+        updateSelectedListDisplay();
+    });
+
+    // ----------------------------------------------------
     // FUNÇÕES DE BACKUP (LOCALSTORAGE) 
     // ----------------------------------------------------
 
@@ -369,24 +446,23 @@
         const destination = tripDestinationInput.value.trim() || 'Lista Sem Nome';
         const timestamp = new Date().toLocaleString('pt-BR');
         
-        if (selectedPassengers.length === 0) return;
+        if (selectedPassengers.length === 0 && currentDrivers.length === 0) return;
 
         // Cria uma cópia limpa dos dados para salvar
         const newBackup = {
             name: `${destination}`,
             pax_count: selectedPassengers.length,
+            driver_count: currentDrivers.length, // NOVO: Salva a contagem de motoristas
             timestamp: timestamp,
             destination: destination,
             selectedPassengers: selectedPassengers,
-            roomAssignments: roomAssignments
+            roomAssignments: roomAssignments,
+            currentDrivers: currentDrivers, // NOVO: Salva os objetos de motorista
         };
 
         let backups = loadBackups();
-        
-        // Adiciona o novo backup no início da lista
         backups.unshift(newBackup);
         
-        // Mantém apenas os 3 backups mais recentes
         if (backups.length > 3) {
             backups = backups.slice(0, 3);
         }
@@ -412,9 +488,13 @@
             selectedPassengers = backupToLoad.selectedPassengers;
             roomAssignments = backupToLoad.roomAssignments;
             tripDestinationInput.value = backupToLoad.destination;
+            
+            // NOVO: Carrega os dados do motorista
+            currentDrivers = backupToLoad.currentDrivers || [];
+            driverCountSelect.value = currentDrivers.length.toString();
 
-            // Atualiza a interface
             updateSelectedListDisplay();
+            updateDriverStatusDisplay();
             alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} passageiros)" carregado com sucesso!`);
         } else {
             alert('Backup não encontrado.');
@@ -434,17 +514,17 @@
         backupButtonsDiv.innerHTML = '';
 
         if (backups.length === 0) {
-            backupButtonsDiv.innerHTML = '<p>Nenhum backup encontrado.</p>';
-            clearBackupsBtn.style.display = 'none';
+            backupButtonsBtn.style.display = 'none';
             return;
         }
 
         clearBackupsBtn.style.display = 'block';
 
         backups.forEach((backup, index) => {
+            const driverText = backup.driver_count > 0 ? ` + ${backup.driver_count} Mot.` : '';
             const button = document.createElement('button');
             button.className = 'backup-btn';
-            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} passageiros) - ${backup.timestamp}`;
+            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} pax ${driverText}) - ${backup.timestamp}`;
             button.onclick = () => window.loadBackup(index);
             backupButtonsDiv.appendChild(button);
         });
@@ -457,11 +537,15 @@
     
     function getUnassignedPassengers() {
         const assignedIds = new Set(roomAssignments.flatMap(room => room.passengers.map(p => p.id)));
-        return selectedPassengers.filter(p => !assignedIds.has(p.id));
+        
+        // Combina passageiros normais e motoristas
+        const allPeople = [...selectedPassengers, ...currentDrivers];
+        
+        // Retorna APENAS os não atribuídos
+        return allPeople.filter(p => !assignedIds.has(p.id));
     }
 
     function renumberRooms() {
-        // Remove quartos que ficaram vazios e limpa a estrutura antes de re-renderizar.
         roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
     }
     
@@ -476,7 +560,7 @@
         
         let html = '<h4>Quartos Atribuídos:</h4>';
         html += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
-        html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Passageiros</th><th>Ações</th></tr></thead><tbody>';
+        html += '<thead><tr style="background-color: #ddd;"><th>Nº Quarto</th><th>Tipo</th><th>Pessoas</th><th>Ações</th></tr></thead><tbody>';
         
         const roomTypes = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
         let sequentialRoomNumber = 1;
@@ -485,7 +569,10 @@
             const roomsOfType = roomAssignments.filter(room => room.type === type);
             
             roomsOfType.forEach((room) => {
-                const passengerNames = room.passengers.map(p => p.nome).join(', ');
+                const passengerNames = room.passengers.map(p => {
+                    // Adiciona um marcador visual se for motorista
+                    return p.isDriver ? `🚚 ${p.nome}` : p.nome;
+                }).join(', ');
                 
                 html += `
                     <tr style="border-bottom: 1px solid #eee;">
@@ -502,13 +589,15 @@
         
         html += '</tbody></table>';
         displayDiv.innerHTML = html;
+        updateDriverStatusDisplay(); // Atualiza o status após renderizar
     }
 
     window.removeRoom = function(roomId) {
-        if (confirm(`Tem certeza que deseja remover este quarto? Os passageiros serão liberados para nova atribuição.`)) {
+        if (confirm(`Tem certeza que deseja remover este quarto? As pessoas serão liberadas para nova atribuição.`)) {
             roomAssignments = roomAssignments.filter(room => room.id !== roomId);
             renderAssignedRoomsDisplay(); 
             updateSelectedListDisplay(); 
+            updateDriverStatusDisplay();
         }
     };
 
@@ -521,9 +610,9 @@
         availablePassengersList.innerHTML = '';
         
         if (unassigned.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
-        } else if (selectedPassengers.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
+            availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todas as pessoas já foram atribuídas a um quarto.</p>';
+        } else if (selectedPassengers.length === 0 && currentDrivers.length === 0) {
+            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros ou configure motoristas primeiro!</p>';
         } else {
             unassigned.forEach(p => {
                 const itemDiv = document.createElement('div');
@@ -535,8 +624,10 @@
                 checkbox.value = p.id;
                 checkbox.setAttribute('data-name', p.nome);
                 
+                const typeLabel = p.isDriver ? ' (MOTORISTA)' : ` (CPF: ${p.cpf})`;
                 const labelText = document.createElement('span');
-                labelText.textContent = `${p.nome} (CPF: ${p.cpf})`;
+                labelText.textContent = `${p.nome}${typeLabel}`;
+                labelText.style.fontWeight = p.isDriver ? 'bold' : 'normal';
 
                 itemDiv.appendChild(checkbox);
                 itemDiv.appendChild(labelText);
@@ -553,44 +644,12 @@
         addRoomModal.style.display = 'block';
     }
 
-    function checkRoomCapacityLimit() {
-        const requiredPax = parseInt(roomPaxCountInput.value) || 0;
-        const currentSelected = availablePassengersList.querySelectorAll('input[name="passengerId"]:checked').length;
-        const checkboxes = availablePassengersList.querySelectorAll('input[name="passengerId"]');
-
-        if (requiredPax === 0) return; 
-
-        checkboxes.forEach(cb => {
-            if (!cb.checked && currentSelected >= requiredPax) {
-                cb.disabled = true;
-                cb.closest('.available-passenger-item').classList.add('disabled');
-            } else {
-                cb.disabled = false;
-                cb.closest('.available-passenger-item').classList.remove('disabled');
-            }
-        });
-    }
-
-    window.removePassengerFromList = function(id) {
-        selectedPassengers = selectedPassengers.filter(person => person.id !== id);
-        
-        roomAssignments.forEach(room => {
-            room.passengers = room.passengers.filter(p => p.id !== id);
-        });
-        
-        roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
-
-        updateSelectedListDisplay();
-        searchInput.dispatchEvent(new Event('input')); 
-    }
-
 
     // ----------------------------------------------------
     // LÓGICA DE PESQUISA, SELEÇÃO E EXIBIÇÃO
     // ----------------------------------------------------
     
     function updatePassengerCountDisplay() { 
-        // Atualiza o contador de passageiros
         passengerCountDisplay.textContent = `(${selectedPassengers.length} passageiros)`;
     }
 
@@ -615,6 +674,7 @@
                     <button onclick="removePassengerFromList(${person.id})" style="background-color: #dc3545; padding: 5px 10px;">Remover</button>
                 `;
 
+                // Verifica atribuição em todos os passageiros E motoristas
                 const isAssigned = roomAssignments.some(room => room.passengers.some(p => p.id === person.id));
                 const assignmentStatus = isAssigned ? ' ✅ Quarto Atribuído' : ' ❌ Sem Quarto';
 
@@ -643,6 +703,7 @@
         searchInput.dispatchEvent(new Event('input')); 
     }
     
+    // Lógica de pesquisa mantida inalterada
     searchInput.addEventListener('input', function() {
         const searchTerm = searchInput.value.toLowerCase().trim();
         searchResultsDiv.innerHTML = ''; 
@@ -683,83 +744,7 @@
     // LÓGICA DE MODAIS E EVENT LISTENERS
     // ----------------------------------------------------
 
-    // Modal Adicionar Pessoa
-    document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
-    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
-    window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-        const newPersonData = {
-            nome: document.getElementById('nome').value,
-            cpf: document.getElementById('cpf').value,
-            data_nascimento: document.getElementById('nascimento').value,
-            rua: document.getElementById('rua').value,
-            numero: document.getElementById('numero').value,
-            cidade: document.getElementById('cidade').value,
-            cep: document.getElementById('cep').value,
-            telefone: document.getElementById('telefone').value,
-        };
-        const savedPerson = await saveNewPerson(newPersonData);
-        if (savedPerson) {
-            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
-            window.addPassengerToList(savedPerson); 
-            form.reset();
-            modal.style.display = 'none';
-        }
-    });
-
-    // Modal Editar Pessoa
-    window.openEditModal = function(id) {
-        const personToEdit = database.find(p => p.id === id);
-        if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
-
-        document.getElementById('edit-id').value = personToEdit.id;
-        document.getElementById('edit-nome').value = personToEdit.nome;
-        document.getElementById('edit-cpf').value = personToEdit.cpf;
-        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
-        document.getElementById('edit-rua').value = personToEdit.rua || '';
-        document.getElementById('edit-numero').value = personToEdit.numero || '';
-        document.getElementById('edit-cidade').value = personToEdit.cidade || '';
-        document.getElementById('edit-cep').value = personToEdit.cep || '';
-        document.getElementById('edit-telefone').value = personToEdit.telefone;
-
-        editModal.style.display = 'block';
-    };
-
-    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
-
-    editForm.addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-        const id = parseInt(document.getElementById('edit-id').value);
-        const updatedData = {
-            nome: document.getElementById('edit-nome').value,
-            cpf: document.getElementById('edit-cpf').value,
-            data_nascimento: document.getElementById('edit-nascimento').value,
-            rua: document.getElementById('edit-rua').value,
-            numero: document.getElementById('edit-numero').value,
-            cidade: document.getElementById('edit-cidade').value,
-            cep: document.getElementById('edit-cep').value,
-            telefone: document.getElementById('edit-telefone').value,
-        };
-        const savedPerson = await updateExistingPerson(updatedData, id);
-        if (savedPerson) {
-            const dbIndex = database.findIndex(p => p.id === id);
-            if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
-            const selIndex = selectedPassengers.findIndex(p => p.id === id);
-            if (selIndex !== -1) { 
-                selectedPassengers[selIndex] = savedPerson; 
-                roomAssignments.forEach(room => {
-                    const paxInRoomIndex = room.passengers.findIndex(p => p.id === id);
-                    if (paxInRoomIndex !== -1) {
-                        room.passengers[paxInRoomIndex] = savedPerson;
-                    }
-                });
-            }
-
-            updateSelectedListDisplay();
-            editModal.style.display = 'none';
-        }
-    });
+    // ... (Modais de Pessoa, mantidos inalterados)
 
     // Modal Adicionar Quarto
     addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
@@ -781,32 +766,41 @@
         const requiredPax = parseInt(roomPaxCountInput.value);
         
         const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
-        const selectedPassengersData = checkedBoxes.map(box => 
-            selectedPassengers.find(p => p.id === parseInt(box.value))
-        );
         
-        if (selectedPassengersData.length === 0) {
-            alert('Selecione pelo menos um passageiro.');
+        // NOVO: Coleta os dados de passageiros e motoristas selecionados
+        const selectedPeopleData = checkedBoxes.map(box => {
+            const id = parseInt(box.value);
+            // Procura primeiro nos passageiros normais
+            let person = selectedPassengers.find(p => p.id === id);
+            // Se não encontrar, procura nos motoristas
+            if (!person) {
+                person = currentDrivers.find(d => d.id === id);
+            }
+            return person;
+        }).filter(p => p !== undefined);
+        
+        if (selectedPeopleData.length === 0) {
+            alert('Selecione pelo menos uma pessoa.');
             return;
         }
         
-        if (selectedPassengersData.length !== requiredPax) {
-            alert(`Erro: O quarto '${type}' requer EXATAMENTE ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
+        if (selectedPeopleData.length !== requiredPax) {
+            alert(`Erro: O quarto '${type}' requer EXATAMENTE ${requiredPax} pessoa(s). Você selecionou ${selectedPeopleData.length}.`);
             return;
         }
         
         roomAssignments.push({
             id: nextRoomNumber++, 
             type: type,
-            passengers: selectedPassengersData
+            passengers: selectedPeopleData
         });
 
         addRoomModal.style.display = 'none';
         renderAssignedRoomsDisplay();
         updateSelectedListDisplay(); 
+        updateDriverStatusDisplay(); // Atualiza o status do motorista
     });
     
-    // Botão Limpar Backups
     clearBackupsBtn.addEventListener('click', window.clearAllBackups);
 
 
@@ -825,7 +819,7 @@
         }
 
         if (selectedPassengers.length === 0) {
-            alert('A lista está vazia! Adicione passageiros para gerar os documentos.');
+            alert('A lista de passageiros está vazia! Adicione passageiros para gerar os documentos.');
             return;
         }
 
@@ -834,9 +828,12 @@
 
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
 
+        // **FILTRAGEM:** Apenas selectedPassengers (exclui motoristas)
+
         // 1. GERAÇÃO DA LISTA COMPLETA (XLSX)
+        const peopleForList = selectedPassengers; // Motoristas já estão fora
         const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
-        const dataForSheet = selectedPassengers.map(person => ([
+        const dataForSheet = peopleForList.map(person => ([
             person.nome, 
             person.cpf, 
             formatDateToBrazilian(person.data_nascimento), 
@@ -861,7 +858,7 @@
             { header: 'TELEFONE', dataKey: 'telefone' }
         ];
 
-        const dataPDFCompleto = selectedPassengers.map(person => ({
+        const dataPDFCompleto = peopleForList.map(person => ({
             nome: person.nome,
             cpf: person.cpf,
             data_nascimento: formatDateToBrazilian(person.data_nascimento),
@@ -896,7 +893,7 @@
             { header: 'CPF', dataKey: 'cpf' }
         ];
 
-        const dataPDFSimples = selectedPassengers.map(person => ({
+        const dataPDFSimples = peopleForList.map(person => ({
             nome: person.nome,
             cpf: person.cpf
         }));
@@ -939,8 +936,11 @@
         renumberRooms();
 
         if (roomAssignments.length === 0) {
-            alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o PDF.');
+            alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o Roomlist.');
             return;
+        }
+        if (currentDrivers.length > 0 && currentDrivers.length !== roomAssignments.filter(r => r.passengers.some(p => p.isDriver)).length) {
+            alert('Atenção: Nem todos os motoristas configurados foram atribuídos a um quarto.');
         }
 
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
@@ -953,7 +953,7 @@
             return acc;
         }, {});
 
-        // 1. GERAÇÃO DO XLSX
+        // 1. GERAÇÃO DO XLSX (INCLUI MOTORISTAS)
         const headersXLSX = [ 'QUARTO', 'TIPO', 'NOME', 'CPF', 'DATA NASCIMENTO' ];
         let dataForSheet = [];
         let roomCounterXLSX = 1;
@@ -962,12 +962,16 @@
             const rooms = roomsByType[category] || [];
             rooms.forEach(room => {
                 room.passengers.forEach((person, paxIndex) => {
+                    // Se for motorista, CPF e Nascimento ficam vazios (como você pediu)
+                    const cpf = person.isDriver ? '' : person.cpf;
+                    const nascimento = person.isDriver ? '' : formatDateToBrazilian(person.data_nascimento);
+
                     const row = [
                         paxIndex === 0 ? roomCounterXLSX : '', 
                         paxIndex === 0 ? room.type : '',       
                         person.nome,
-                        person.cpf,
-                        formatDateToBrazilian(person.data_nascimento)
+                        cpf,
+                        nascimento
                     ];
                     dataForSheet.push(row);
                 });
@@ -985,7 +989,7 @@
         XLSX.writeFile(workbook, `${baseFileName}_ROOMLIST.xlsx`);
 
 
-        // 2. GERAÇÃO DO PDF 
+        // 2. GERAÇÃO DO PDF (INCLUI MOTORISTAS)
         const { jsPDF } = window.jspdf;
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
         
@@ -1033,11 +1037,16 @@
                     
                     const roomDisplay = isFirstInRoom ? roomCounterPDF.toString() : '';
                     
+                    // Se for motorista, CPF e Nascimento ficam vazios
+                    const nomeDisplay = person.isDriver ? `🚚 ${person.nome}` : person.nome;
+                    const cpf = person.isDriver ? '' : person.cpf;
+                    const nascimento = person.isDriver ? '' : formatDateToBrazilian(person.data_nascimento);
+
                     const row = [
                         roomDisplay, 
-                        person.nome,
-                        formatDateToBrazilian(person.data_nascimento),
-                        person.cpf
+                        nomeDisplay,
+                        nascimento,
+                        cpf
                     ];
                     finalTableData.push(row);
                     
@@ -1127,6 +1136,8 @@
     // ----------------------------------------------------
 
     loadAllPassengers().then(() => {
+        // Inicializa motoristas (garante 0 motoristas se nenhum backup for carregado)
+        createDriverObjects(parseInt(driverCountSelect.value)); 
         updateSelectedListDisplay(); 
         renderBackupButtons(); 
     });
