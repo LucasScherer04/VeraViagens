@@ -85,7 +85,7 @@
     
 
     <div class="person-list">
-        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0 pax)</span></h2> 
+        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0 passageiros)</span></h2> 
         <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
             <label for="tripDestination" style="font-weight: bold; display: block; margin-bottom: 5px;">Destino da Viagem (Nome do Arquivo):</label>
             <input type="text" id="tripDestination" placeholder="Ex: Piratuba outubro" required 
@@ -415,7 +415,7 @@
 
             // Atualiza a interface
             updateSelectedListDisplay();
-            alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} pax)" carregado com sucesso!`);
+            alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} passageiros)" carregado com sucesso!`);
         } else {
             alert('Backup não encontrado.');
         }
@@ -444,7 +444,7 @@
         backups.forEach((backup, index) => {
             const button = document.createElement('button');
             button.className = 'backup-btn';
-            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} pax) - ${backup.timestamp}`;
+            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} passageiros) - ${backup.timestamp}`;
             button.onclick = () => window.loadBackup(index);
             backupButtonsDiv.appendChild(button);
         });
@@ -591,7 +591,7 @@
     
     function updatePassengerCountDisplay() { 
         // Atualiza o contador de passageiros
-        passengerCountDisplay.textContent = `(${selectedPassengers.length} pax)`;
+        passengerCountDisplay.textContent = `(${selectedPassengers.length} passageiros)`;
     }
 
     function updateSelectedListDisplay() {
