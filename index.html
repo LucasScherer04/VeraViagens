@@ -571,7 +571,7 @@
             
             roomsOfType.forEach((room) => {
                 const passengerNames = room.passengers.map(p => {
-                    return p.isDriver ? `${p.nome}` : p.nome;
+                    return p.isDriver ? `* ${p.nome}` : p.nome;
                 }).join(', ');
                 
                 html += `
