@@ -108,7 +108,7 @@
             </div>
 
             <button id="generateRoomListBtn" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Gerar Room List PDF e XLSX
+                Gerar Room List
             </button>
         </div>
 
@@ -129,11 +129,8 @@
                         <option value="Triplo">Triplo (3 Pax)</option>
                         <option value="Quadruplo">Quádruplo (4 Pax)</option>
                     </select>
-                    
-                    <label for="roomPaxCount">Quantidade de Passageiros Requerida:</label>
-                    <input type="number" id="roomPaxCount" min="1" required disabled title="Selecionado automaticamente com base no tipo de quarto."><br>
-
-                    <label>Passageiros (Selecione **exatamente** o número requerido):</label>
+                   
+                    <label>Passageiros (Selecione os passageiros):</label>
                     <div id="availablePassengersList" style="max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px;">
                         <p>Nenhum passageiro disponível. Adicione-os à lista principal.</p>
                     </div>
@@ -146,7 +143,7 @@
     
     <hr>
 
-    <button id="finishListBtn" disabled>Finalizar Lista (Gerar 3 Arquivos)</button>
+    <button id="finishListBtn" disabled>Finalizar Lista</button>
 </div>
 
 
@@ -415,7 +412,7 @@
 
             // Atualiza a interface
             updateSelectedListDisplay();
-            alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} pax)" carregado com sucesso!`);
+            alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} passageiros)" carregado com sucesso!`);
         } else {
             alert('Backup não encontrado.');
         }
@@ -444,7 +441,7 @@
         backups.forEach((backup, index) => {
             const button = document.createElement('button');
             button.className = 'backup-btn';
-            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} pax) - ${backup.timestamp}`;
+            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} passageiros) - ${backup.timestamp}`;
             button.onclick = () => window.loadBackup(index);
             backupButtonsDiv.appendChild(button);
         });
@@ -591,7 +588,7 @@
     
     function updatePassengerCountDisplay() { 
         // Atualiza o contador de passageiros
-        passengerCountDisplay.textContent = `(${selectedPassengers.length} pax)`;
+        passengerCountDisplay.textContent = `(${selectedPassengers.length} passageiros)`;
     }
 
     function updateSelectedListDisplay() {
