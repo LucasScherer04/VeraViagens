@@ -571,7 +571,7 @@
             
             roomsOfType.forEach((room) => {
                 const passengerNames = room.passengers.map(p => {
-                    return p.isDriver ? `🚚 ${p.nome}` : p.nome;
+                    return p.isDriver ? `${p.nome}` : p.nome;
                 }).join(', ');
                 
                 html += `
@@ -1042,9 +1042,6 @@
         if (roomAssignments.length === 0) {
             alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o Roomlist.');
             return;
-        }
-        if (currentDrivers.length > 0 && currentDrivers.length !== roomAssignments.filter(r => r.passengers.some(p => p.isDriver)).length) {
-            alert('Atenção: Nem todos os motoristas configurados foram atribuídos a um quarto.');
         }
 
         const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
