@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vera Viagens - Lista de Passageiros</title>
+    <title>Vera Viagens - Lista de Passageiros e Roomlist</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -64,7 +64,7 @@
     <hr>
 
     <div class="backup-area">
-        <h2>Listas Anteriores (Backup)</h2>
+        <h2>Listas Anteriores (Backup Local)</h2>
         <p style="margin-top: 0;">Carregue uma lista para editá-la ou gerar novos documentos.</p>
         <div id="backupButtons">
             <p>Nenhum backup encontrado.</p>
@@ -74,7 +74,7 @@
     <hr>
     
     <div class="search-area">
-        <h2>Pesquisar e Selecionar os Passageiros</h2>
+        <h2>1. Pesquisar e Selecionar os Passageiros</h2>
         <input type="text" id="searchInput" placeholder="Pesquisar por Nome ou CPF...">
         <p id="loadingMsg">Carregando passageiros...</p>
         <div id="searchResults">
@@ -85,7 +85,7 @@
     
 
     <div class="person-list">
-        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0)</span></h2> 
+        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0 pax)</span></h2> 
         <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
             <label for="tripDestination" style="font-weight: bold; display: block; margin-bottom: 5px;">Destino da Viagem (Nome do Arquivo):</label>
             <input type="text" id="tripDestination" placeholder="Ex: Piratuba outubro" required 
@@ -108,7 +108,7 @@
             </div>
 
             <button id="generateRoomListBtn" style="margin-top: 20px; padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Gerar Room List
+                Gerar Room List PDF e XLSX
             </button>
         </div>
 
@@ -146,7 +146,7 @@
     
     <hr>
 
-    <button id="finishListBtn" disabled>Finalizar Lista</button>
+    <button id="finishListBtn" disabled>Finalizar Lista (Gerar 3 Arquivos)</button>
 </div>
 
 
@@ -523,7 +523,7 @@
         if (unassigned.length === 0) {
             availablePassengersList.innerHTML = '<p style="color: green; font-weight: bold;">Todos os passageiros já foram atribuídos a um quarto.</p>';
         } else if (selectedPassengers.length === 0) {
-            availablePassengersList.innerHTML = '<p style="color: blue; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
+            availablePassengersList.innerHTML = '<p style="color: red; font-weight: bold;">Adicione passageiros à lista principal primeiro!</p>';
         } else {
             unassigned.forEach(p => {
                 const itemDiv = document.createElement('div');
@@ -953,7 +953,39 @@
             return acc;
         }, {});
 
-        //GERAÇÃO DO PDF 
+        // 1. GERAÇÃO DO XLSX
+        const headersXLSX = [ 'QUARTO', 'TIPO', 'NOME', 'CPF', 'DATA NASCIMENTO' ];
+        let dataForSheet = [];
+        let roomCounterXLSX = 1;
+
+        roomTypesOrder.forEach((category) => {
+            const rooms = roomsByType[category] || [];
+            rooms.forEach(room => {
+                room.passengers.forEach((person, paxIndex) => {
+                    const row = [
+                        paxIndex === 0 ? roomCounterXLSX : '', 
+                        paxIndex === 0 ? room.type : '',       
+                        person.nome,
+                        person.cpf,
+                        formatDateToBrazilian(person.data_nascimento)
+                    ];
+                    dataForSheet.push(row);
+                });
+                roomCounterXLSX++;
+            });
+        });
+
+        dataForSheet.unshift(headersXLSX);
+        
+        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
+        worksheet['!cols'] = [ { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 18 }, { wch: 20 } ];
+        
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Roomlist');
+        XLSX.writeFile(workbook, `${baseFileName}_ROOMLIST.xlsx`);
+
+
+        // 2. GERAÇÃO DO PDF 
         const { jsPDF } = window.jspdf;
         const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
         
@@ -1086,7 +1118,7 @@
         });
 
         docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
-        alert(`Arquivo gerado com sucesso:\n- ${baseFileName}_ROOMLIST.pdf);
+        alert(`Dois arquivos gerados com sucesso:\n- ${baseFileName}_ROOMLIST.pdf\n- ${baseFileName}_ROOMLIST.xlsx`);
     });
 
 
