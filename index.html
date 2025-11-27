@@ -34,7 +34,7 @@
             width: auto;
         }
         input[type="text"], input[type="date"], select, input[type="number"] { padding: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 15px; border: none; border-radius: 4 कुत्तों; cursor: pointer; color: white; margin-top: 10px; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-top: 10px; }
         #addPersonBtn { background-color: #4caf50; }
         #finishListBtn { background-color: #1e88e5; }
         .search-area, .person-list { margin-top: 20px; padding: 15px; border: 1px dashed #ccc; border-radius: 4px; }
@@ -43,14 +43,14 @@
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px; }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
         .close-btn:hover { color: black; text-decoration: none; cursor: pointer; }
-        /* Novos estilos para o contador e backups */
+        /* Estilos para o contador e backups */
         #passengerCountDisplay { font-size: 1.1em; font-weight: bold; color: #dc3545; margin-left: 10px; }
         .available-passenger-item { display: flex; align-items: center; padding: 4px 0; cursor: pointer; transition: background-color 0.2s; }
         .available-passenger-item:hover { background-color: #f0f0f0; }
         .available-passenger-item input[type="checkbox"] { width: auto; margin-right: 10px; }
         .available-passenger-item.disabled { opacity: 0.5; cursor: not-allowed; }
         .backup-area { margin-top: 20px; padding: 15px; border: 1px solid #1e88e5; border-radius: 4px; background-color: #e3f2fd; }
-        .backup-btn { background-color: #1e88e5; margin-right: 10px; margin-bottom: 5px; padding: 8px 12px; font-size: 0.9em; }
+        .backup-btn { background-color: #6c757d; margin-right: 10px; margin-bottom: 5px; padding: 8px 12px; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -85,7 +85,8 @@
     
 
     <div class="person-list">
-        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0)</span></h2> <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
+        <h2>Passageiros Selecionados <span id="passengerCountDisplay">(0 pax)</span></h2> 
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px;">
             <label for="tripDestination" style="font-weight: bold; display: block; margin-bottom: 5px;">Destino da Viagem (Nome do Arquivo):</label>
             <input type="text" id="tripDestination" placeholder="Ex: Piratuba outubro" required 
                 style="width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #aaa; border-radius: 4px;">
@@ -233,7 +234,7 @@
     // --- VARIÁVEIS GLOBAIS E ESTRUTURAS DE DADOS ---
     let database = []; 
     let selectedPassengers = []; 
-    let roomAssignments = []; // Array de objetos de quartos atribuídos
+    let roomAssignments = []; 
     let nextRoomNumber = 1; 
 
     const roomCapacityMap = {
@@ -248,7 +249,7 @@
     const emptyListMsg = document.getElementById('emptyListMsg');
     const finishListBtn = document.getElementById('finishListBtn');
     const loadingMsg = document.getElementById('loadingMsg');
-    const passengerCountDisplay = document.getElementById('passengerCountDisplay'); // 👈 MELHORIA 1
+    const passengerCountDisplay = document.getElementById('passengerCountDisplay'); 
     const tripDestinationInput = document.getElementById('tripDestination');
     
     // Modais e Formulários de Pessoa
@@ -351,7 +352,7 @@
 
 
     // ----------------------------------------------------
-    // FUNÇÕES DE BACKUP (LOCALSTORAGE) 👈 MELHORIA 2
+    // FUNÇÕES DE BACKUP (LOCALSTORAGE) 
     // ----------------------------------------------------
 
     function loadBackups() {
@@ -370,8 +371,10 @@
         
         if (selectedPassengers.length === 0) return;
 
+        // Cria uma cópia limpa dos dados para salvar
         const newBackup = {
-            name: `${destination} (${selectedPassengers.length} pax)`,
+            name: `${destination}`,
+            pax_count: selectedPassengers.length,
             timestamp: timestamp,
             destination: destination,
             selectedPassengers: selectedPassengers,
@@ -390,7 +393,7 @@
 
         try {
             localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
-            renderBackupButtons(); // Atualiza os botões imediatamente
+            renderBackupButtons(); 
         } catch (e) {
             console.error("Erro ao salvar backup:", e);
         }
@@ -412,7 +415,7 @@
 
             // Atualiza a interface
             updateSelectedListDisplay();
-            alert(`Backup de "${backupToLoad.name}" carregado com sucesso!`);
+            alert(`Backup de "${backupToLoad.name} (${backupToLoad.pax_count} pax)" carregado com sucesso!`);
         } else {
             alert('Backup não encontrado.');
         }
@@ -441,12 +444,12 @@
         backups.forEach((backup, index) => {
             const button = document.createElement('button');
             button.className = 'backup-btn';
-            button.style.backgroundColor = '#6c757d';
-            button.textContent = `${index + 1}. ${backup.name} (${backup.timestamp})`;
+            button.textContent = `${index + 1}. ${backup.name} (${backup.pax_count} pax) - ${backup.timestamp}`;
             button.onclick = () => window.loadBackup(index);
             backupButtonsDiv.appendChild(button);
         });
     }
+
 
     // ----------------------------------------------------
     // LÓGICA DE GESTÃO DE QUARTOS 
@@ -458,6 +461,7 @@
     }
 
     function renumberRooms() {
+        // Remove quartos que ficaram vazios e limpa a estrutura antes de re-renderizar.
         roomAssignments = roomAssignments.filter(room => room.passengers.length > 0);
     }
     
@@ -585,12 +589,13 @@
     // LÓGICA DE PESQUISA, SELEÇÃO E EXIBIÇÃO
     // ----------------------------------------------------
     
-    function updatePassengerCountDisplay() { // 👈 NOVO: MELHORIA 1
+    function updatePassengerCountDisplay() { 
+        // Atualiza o contador de passageiros
         passengerCountDisplay.textContent = `(${selectedPassengers.length} pax)`;
     }
 
     function updateSelectedListDisplay() {
-        updatePassengerCountDisplay(); // Atualiza o contador
+        updatePassengerCountDisplay(); 
         
         selectedPassengersDiv.innerHTML = '';
         if (selectedPassengers.length === 0) {
@@ -648,4 +653,484 @@
         }
 
         const results = database.filter(person => {
-            const isSelected = selectedPassengers.some(p => p.id === person
+            const isSelected = selectedPassengers.some(p => p.id === person.id);
+            if (isSelected) return false; 
+            
+            return person.nome.toLowerCase().includes(searchTerm) || 
+                   person.cpf.toLowerCase().includes(searchTerm);
+        });
+
+        if (results.length === 0) {
+            searchResultsDiv.innerHTML = '<p>Nenhum resultado encontrado ou todos já selecionados.</p>';
+        } else {
+            results.forEach(person => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'list-item';
+                
+                const personJsonSafe = JSON.stringify(person).replace(/"/g, '&quot;'); 
+
+                resultDiv.innerHTML = `
+                    <span>${person.nome} (${person.cpf})</span>
+                    <button onclick='addPassengerToList(${personJsonSafe})' style="background-color: #6c757d; padding: 5px 10px;">Adicionar</button>
+                `;
+                searchResultsDiv.appendChild(resultDiv);
+            });
+        }
+    });
+
+
+    // ----------------------------------------------------
+    // LÓGICA DE MODAIS E EVENT LISTENERS
+    // ----------------------------------------------------
+
+    // Modal Adicionar Pessoa
+    document.getElementById('addPersonBtn').addEventListener('click', function() { modal.style.display = 'block'; });
+    closeBtn.addEventListener('click', function() { modal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === modal) { modal.style.display = 'none'; } });
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        const newPersonData = {
+            nome: document.getElementById('nome').value,
+            cpf: document.getElementById('cpf').value,
+            data_nascimento: document.getElementById('nascimento').value,
+            rua: document.getElementById('rua').value,
+            numero: document.getElementById('numero').value,
+            cidade: document.getElementById('cidade').value,
+            cep: document.getElementById('cep').value,
+            telefone: document.getElementById('telefone').value,
+        };
+        const savedPerson = await saveNewPerson(newPersonData);
+        if (savedPerson) {
+            alert(`Pessoa "${savedPerson.nome}" salva permanentemente no Supabase e adicionada à lista atual!`);
+            window.addPassengerToList(savedPerson); 
+            form.reset();
+            modal.style.display = 'none';
+        }
+    });
+
+    // Modal Editar Pessoa
+    window.openEditModal = function(id) {
+        const personToEdit = database.find(p => p.id === id);
+        if (!personToEdit) { alert('Passageiro não encontrado.'); return; }
+
+        document.getElementById('edit-id').value = personToEdit.id;
+        document.getElementById('edit-nome').value = personToEdit.nome;
+        document.getElementById('edit-cpf').value = personToEdit.cpf;
+        document.getElementById('edit-nascimento').value = personToEdit.data_nascimento;
+        document.getElementById('edit-rua').value = personToEdit.rua || '';
+        document.getElementById('edit-numero').value = personToEdit.numero || '';
+        document.getElementById('edit-cidade').value = personToEdit.cidade || '';
+        document.getElementById('edit-cep').value = personToEdit.cep || '';
+        document.getElementById('edit-telefone').value = personToEdit.telefone;
+
+        editModal.style.display = 'block';
+    };
+
+    closeEditBtn.addEventListener('click', function() { editModal.style.display = 'none'; });
+
+    editForm.addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        const id = parseInt(document.getElementById('edit-id').value);
+        const updatedData = {
+            nome: document.getElementById('edit-nome').value,
+            cpf: document.getElementById('edit-cpf').value,
+            data_nascimento: document.getElementById('edit-nascimento').value,
+            rua: document.getElementById('edit-rua').value,
+            numero: document.getElementById('edit-numero').value,
+            cidade: document.getElementById('edit-cidade').value,
+            cep: document.getElementById('edit-cep').value,
+            telefone: document.getElementById('edit-telefone').value,
+        };
+        const savedPerson = await updateExistingPerson(updatedData, id);
+        if (savedPerson) {
+            const dbIndex = database.findIndex(p => p.id === id);
+            if (dbIndex !== -1) { database[dbIndex] = savedPerson; }
+            const selIndex = selectedPassengers.findIndex(p => p.id === id);
+            if (selIndex !== -1) { 
+                selectedPassengers[selIndex] = savedPerson; 
+                roomAssignments.forEach(room => {
+                    const paxInRoomIndex = room.passengers.findIndex(p => p.id === id);
+                    if (paxInRoomIndex !== -1) {
+                        room.passengers[paxInRoomIndex] = savedPerson;
+                    }
+                });
+            }
+
+            updateSelectedListDisplay();
+            editModal.style.display = 'none';
+        }
+    });
+
+    // Modal Adicionar Quarto
+    addRoomBtn.addEventListener('click', () => { openAddRoomModal(); });
+    closeRoomBtn.addEventListener('click', () => { addRoomModal.style.display = 'none'; });
+    window.addEventListener('click', function(event) { if (event.target === addRoomModal) { addRoomModal.style.display = 'none'; } });
+
+    roomTypeSelect.addEventListener('change', (e) => {
+        const type = e.target.value;
+        const capacity = roomCapacityMap[type] || 0;
+        roomPaxCountInput.value = capacity;
+        roomPaxCountInput.disabled = true;
+        checkRoomCapacityLimit(); 
+    });
+
+    addRoomForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const type = roomTypeSelect.value;
+        const requiredPax = parseInt(roomPaxCountInput.value);
+        
+        const checkedBoxes = Array.from(availablePassengersList.querySelectorAll('input[name="passengerId"]:checked'));
+        const selectedPassengersData = checkedBoxes.map(box => 
+            selectedPassengers.find(p => p.id === parseInt(box.value))
+        );
+        
+        if (selectedPassengersData.length === 0) {
+            alert('Selecione pelo menos um passageiro.');
+            return;
+        }
+        
+        if (selectedPassengersData.length !== requiredPax) {
+            alert(`Erro: O quarto '${type}' requer EXATAMENTE ${requiredPax} passageiro(s). Você selecionou ${selectedPassengersData.length}.`);
+            return;
+        }
+        
+        roomAssignments.push({
+            id: nextRoomNumber++, 
+            type: type,
+            passengers: selectedPassengersData
+        });
+
+        addRoomModal.style.display = 'none';
+        renderAssignedRoomsDisplay();
+        updateSelectedListDisplay(); 
+    });
+    
+    // Botão Limpar Backups
+    clearBackupsBtn.addEventListener('click', window.clearAllBackups);
+
+
+    // ----------------------------------------------------
+    // LÓGICA DE GERAÇÃO DOS ARQUIVOS (FINALIZAR LISTA)
+    // ----------------------------------------------------
+
+    finishListBtn.addEventListener('click', function() {
+        const destinationInput = document.getElementById('tripDestination');
+        const destination = destinationInput.value.trim();
+
+        if (!destination) {
+            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
+            destinationInput.focus();
+            return;
+        }
+
+        if (selectedPassengers.length === 0) {
+            alert('A lista está vazia! Adicione passageiros para gerar os documentos.');
+            return;
+        }
+
+        // Salva a lista como backup
+        saveCurrentListAsBackup(); 
+
+        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+
+        // 1. GERAÇÃO DA LISTA COMPLETA (XLSX)
+        const headersXLSX = [ 'NOME', 'CPF', 'DATA DE NASCIMENTO', 'ENDEREÇO', 'TELEFONE' ];
+        const dataForSheet = selectedPassengers.map(person => ([
+            person.nome, 
+            person.cpf, 
+            formatDateToBrazilian(person.data_nascimento), 
+            formatAddress(person), 
+            person.telefone,
+        ]));
+        dataForSheet.unshift(headersXLSX);
+        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
+        worksheet['!cols'] = [ { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 40 }, { wch: 20 } ];
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista Completa');
+        XLSX.writeFile(workbook, `${baseFileName}_COMPLETO.xlsx`);
+
+        // 2. GERAÇÃO DA LISTA COMPLETA (PDF PAISAGEM)
+        const { jsPDF } = window.jspdf;
+        const docCompleto = new jsPDF('landscape', 'mm', 'a4'); 
+        const headersCompleto = [
+            { header: 'NOME', dataKey: 'nome' },
+            { header: 'CPF', dataKey: 'cpf' },
+            { header: 'DATA DE NASCIMENTO', dataKey: 'data_nascimento' },
+            { header: 'ENDEREÇO', dataKey: 'endereco_completo' },
+            { header: 'TELEFONE', dataKey: 'telefone' }
+        ];
+
+        const dataPDFCompleto = selectedPassengers.map(person => ({
+            nome: person.nome,
+            cpf: person.cpf,
+            data_nascimento: formatDateToBrazilian(person.data_nascimento),
+            endereco_completo: formatAddress(person),
+            telefone: person.telefone
+        }));
+
+        docCompleto.autoTable({
+            head: [headersCompleto.map(h => h.header)],
+            body: dataPDFCompleto.map(obj => Object.values(obj)),
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 9, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
+            bodyStyles: { fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
+            columnStyles: {
+                0: { cellWidth: 45 }, 
+                1: { cellWidth: 30, halign: 'center' }, 
+                2: { cellWidth: 35, halign: 'center' }, 
+                3: { cellWidth: 140, halign: 'center' }, 
+                4: { cellWidth: 30, halign: 'center' }
+            },
+            startY: 20,
+            margin: { top: 10, left: 10, right: 10 }
+        });
+
+        docCompleto.save(`${baseFileName}_COMPLETO.pdf`);
+
+
+        // 3. GERAÇÃO DA LISTA SIMPLES (PDF RETRATO)
+        const docSimples = new jsPDF('portrait', 'mm', 'a4'); 
+
+        const headersSimples = [
+            { header: 'NOME', dataKey: 'nome' },
+            { header: 'CPF', dataKey: 'cpf' }
+        ];
+
+        const dataPDFSimples = selectedPassengers.map(person => ({
+            nome: person.nome,
+            cpf: person.cpf
+        }));
+
+        docSimples.autoTable({
+            head: [headersSimples.map(h => h.header)],
+            body: dataPDFSimples.map(obj => Object.values(obj)),
+            
+            headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', lineWidth: 0.1, lineColor: [0, 0, 0], fontSize: 10, fillColor: [230, 230, 230], textColor: [0, 0, 0] },
+            bodyStyles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], textColor: [0, 0, 0] },
+            
+            columnStyles: {
+                0: { cellWidth: 100 }, 
+                1: { cellWidth: 50, halign: 'center' } 
+            },
+            startY: 20,
+            margin: { top: 10, left: 30, right: 30 } 
+        });
+
+        docSimples.save(`${baseFileName}_ONIBUS.pdf`);
+
+        alert(`Três arquivos gerados com sucesso:\n- ${baseFileName}_ONIBUS.pdf\n- ${baseFileName}_COMPLETO.pdf\n- ${baseFileName}_COMPLETO.xlsx`);
+    });
+
+
+    // ----------------------------------------------------
+    // LÓGICA DE GERAÇÃO DO ROOMLIST PDF E XLSX (BOTÃO DEDICADO)
+    // ----------------------------------------------------
+
+    generateRoomListBtn.addEventListener('click', function() {
+        const destinationInput = document.getElementById('tripDestination');
+        const destination = destinationInput.value.trim();
+
+        if (!destination) {
+            alert('Por favor, preencha o campo "Destino da Viagem" para nomear os arquivos.');
+            destinationInput.focus();
+            return;
+        }
+        
+        renumberRooms();
+
+        if (roomAssignments.length === 0) {
+            alert('Nenhum quarto foi atribuído. Adicione quartos antes de gerar o PDF.');
+            return;
+        }
+
+        const baseFileName = destination.replace(/[^a-z0-9]/gi, '_').replace(/_{2,}/g, '_').toUpperCase();
+        
+        const roomTypesOrder = ['Individual', 'Casal', 'Duplo', 'Triplo', 'Quadruplo'];
+        
+        const roomsByType = roomAssignments.reduce((acc, room) => {
+            acc[room.type] = acc[room.type] || [];
+            acc[room.type].push(room);
+            return acc;
+        }, {});
+
+        // 1. GERAÇÃO DO XLSX
+        const headersXLSX = [ 'QUARTO', 'TIPO', 'NOME', 'CPF', 'DATA NASCIMENTO' ];
+        let dataForSheet = [];
+        let roomCounterXLSX = 1;
+
+        roomTypesOrder.forEach((category) => {
+            const rooms = roomsByType[category] || [];
+            rooms.forEach(room => {
+                room.passengers.forEach((person, paxIndex) => {
+                    const row = [
+                        paxIndex === 0 ? roomCounterXLSX : '', 
+                        paxIndex === 0 ? room.type : '',       
+                        person.nome,
+                        person.cpf,
+                        formatDateToBrazilian(person.data_nascimento)
+                    ];
+                    dataForSheet.push(row);
+                });
+                roomCounterXLSX++;
+            });
+        });
+
+        dataForSheet.unshift(headersXLSX);
+        
+        const worksheet = XLSX.utils.aoa_to_sheet(dataForSheet);
+        worksheet['!cols'] = [ { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 18 }, { wch: 20 } ];
+        
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Roomlist');
+        XLSX.writeFile(workbook, `${baseFileName}_ROOMLIST.xlsx`);
+
+
+        // 2. GERAÇÃO DO PDF 
+        const { jsPDF } = window.jspdf;
+        const docRoomList = new jsPDF('portrait', 'mm', 'a4'); 
+        
+        const LOGO_WIDTH = 70; 
+        const LOGO_HEIGHT = 20; 
+        const PAGE_WIDTH = docRoomList.internal.pageSize.getWidth();
+        const CENTER_X = (PAGE_WIDTH / 2) - (LOGO_WIDTH / 2);
+
+        docRoomList.addImage("logo.png", "PNG", CENTER_X, 5, LOGO_WIDTH, LOGO_HEIGHT);
+        let finalY = 40; 
+        let tableIndex = 0;
+        let roomColorData = [];
+        
+        roomTypesOrder.forEach((category) => {
+            const rooms = roomsByType[category] || [];
+
+            if (rooms.length === 0) return;
+
+            if (tableIndex > 0) {
+                finalY += 10; 
+            }
+
+            if (finalY + 20 > docRoomList.internal.pageSize.getHeight()) {
+                docRoomList.addPage();
+                docRoomList.addImage("logo.png", "PNG", CENTER_X, 5, LOGO_WIDTH, LOGO_HEIGHT);
+                finalY = 30; 
+            }
+
+            docRoomList.setFontSize(18);
+            docRoomList.setFont(undefined, 'bold');
+            docRoomList.setTextColor(0, 0, 0); 
+            docRoomList.text(category.toUpperCase(), docRoomList.internal.pageSize.getWidth() / 2, finalY, { align: 'center' });
+            finalY += 5; 
+            
+            
+            let finalTableData = [];
+            roomColorData = []; 
+            let roomCounterPDF = 1; 
+            
+            rooms.forEach(room => {
+                const roomCapacity = roomCapacityMap[room.type] || 1; 
+                
+                room.passengers.forEach((person, paxIndex) => {
+                    const isFirstInRoom = paxIndex === 0;
+                    
+                    const roomDisplay = isFirstInRoom ? roomCounterPDF.toString() : '';
+                    
+                    const row = [
+                        roomDisplay, 
+                        person.nome,
+                        formatDateToBrazilian(person.data_nascimento),
+                        person.cpf
+                    ];
+                    finalTableData.push(row);
+                    
+                    roomColorData.push({
+                        roomIndex: roomCounterPDF,
+                        capacity: roomCapacity,
+                    });
+                });
+                roomCounterPDF++;
+            });
+
+
+            const headersCategory = [
+                ['QUARTO', 'NOME', 'DATA DE NASCIMENTO', 'CPF']
+            ];
+
+
+            docRoomList.autoTable({
+                head: headersCategory,
+                body: finalTableData, 
+                startY: finalY + 2, 
+                theme: 'grid', 
+                margin: { top: 10, left: 10, right: 10 },
+                styles: { 
+                    fontSize: 9, 
+                    cellPadding: 2, 
+                    textColor: [0, 0, 0]
+                }, 
+
+                headStyles: { 
+                    fontStyle: 'bold', 
+                    halign: 'center', 
+                    valign: 'middle', 
+                    fillColor: [60, 130, 200], 
+                    textColor: 255, 
+                },
+                
+                columnStyles: {
+                    0: { cellWidth: 25, halign: 'center' }, 
+                    1: { cellWidth: 85, halign: 'center' }, 
+                    2: { cellWidth: 50, halign: 'center' }, 
+                    3: { cellWidth: 30, halign: 'center' } 
+                },
+                
+                didParseCell: (data) => {
+                    if (data.section === 'body') {
+                        const rowStyleData = roomColorData[data.row.index];
+                        
+                        if (rowStyleData) {
+                            const roomIndex = rowStyleData.roomIndex;
+                            
+                            if (roomIndex % 2 !== 0) {
+                                data.cell.styles.fillColor = [255, 255, 255]; 
+                                if (data.column.index === 0) {
+                                    data.cell.styles.fontStyle = 'bold';
+                                    data.cell.styles.fontSize = 12;
+                                }
+                            } else {
+                                data.cell.styles.fillColor = [240, 245, 255]; 
+                                if (data.column.index === 0) {
+                                    data.cell.styles.fontStyle = 'bold';
+                                    data.cell.styles.fontSize = 12;
+                                }
+                            }
+                        }
+                    }
+                },
+                
+                didDrawPage: (data) => {
+                    finalY = data.cursor.y;
+                }
+            });
+
+            const table = docRoomList.autoTable.previous;
+            finalY = table.finalY;
+            
+            tableIndex++; 
+        });
+
+        docRoomList.save(`${baseFileName}_ROOMLIST.pdf`);
+        alert(`Dois arquivos gerados com sucesso:\n- ${baseFileName}_ROOMLIST.pdf\n- ${baseFileName}_ROOMLIST.xlsx`);
+    });
+
+
+    // ----------------------------------------------------
+    // INICIALIZAÇÃO
+    // ----------------------------------------------------
+
+    loadAllPassengers().then(() => {
+        updateSelectedListDisplay(); 
+        renderBackupButtons(); 
+    });
+</script>
+
+</body>
+</html>
