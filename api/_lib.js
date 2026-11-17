@@ -3,9 +3,12 @@ const crypto = require('crypto');
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
 
 function getConfig() {
-    const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-    const appPassword = process.env.APP_PASSWORD || '01010101';
+    const supabaseUrl = (process.env.SUPABASE_URL || '')
+        .trim()
+        .replace(/\/+$/, '')
+        .replace(/\/rest\/v1$/i, '');
+    const supabaseKey = (process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
+    const appPassword = (process.env.APP_PASSWORD || '01010101').trim();
     const signingSecret = process.env.AUTH_SECRET || `${appPassword}:${supabaseKey || 'vera-viagens'}`;
     return { supabaseUrl, supabaseKey, appPassword, signingSecret };
 }
