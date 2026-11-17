@@ -2085,6 +2085,7 @@
                 docRoomList.text(category.toUpperCase(), PAGE_WIDTH / 2, finalY, { align: 'center' });
                 finalY += 5;
 
+                const hasObs = rooms.some(r => (r.observation || '').trim().length > 0);
                 const finalTableData = [];
                 const roomColorData = [];
                 let roomCounterPDF = 1;
@@ -2094,35 +2095,50 @@
                         const isFirst = paxIndex === 0;
                         const cpf = person.cpf || '';
                         const nascimento = person.data_nascimento ? formatDateToBrazilian(person.data_nascimento) : '';
-                        const obs = isFirst ? (room.observation || '') : '';
-
-                        finalTableData.push([
+                        const row = [
                             isFirst ? roomCounterPDF.toString() : '',
                             person.nome,
                             nascimento,
-                            cpf,
-                            obs
-                        ]);
+                            cpf
+                        ];
+                        if (hasObs) {
+                            row.push(isFirst ? (room.observation || '') : '');
+                        }
+
+                        finalTableData.push(row);
                         roomColorData.push({ roomIndex: roomCounterPDF });
                     });
                     roomCounterPDF++;
                 });
 
-                docRoomList.autoTable({
-                    head: [['QUARTO', 'NOME', 'NASCIMENTO', 'CPF', 'OBSERVAÇÕES']],
-                    body: finalTableData,
-                    startY: finalY + 2,
-                    theme: 'grid',
-                    margin: { top: 10, left: 10, right: 10 },
-                    styles: { fontSize: 8.5, cellPadding: 2, textColor: [0, 0, 0] },
-                    headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', fillColor: [77, 104, 82], textColor: 255 },
-                    columnStyles: {
+                const headCols = hasObs
+                    ? [['QUARTO', 'NOME', 'NASCIMENTO', 'CPF', 'OBSERVAÇÕES']]
+                    : [['QUARTO', 'NOME', 'DATA DE NASCIMENTO', 'CPF']];
+
+                const colStyles = hasObs
+                    ? {
                         0: { cellWidth: 18, halign: 'center' },
                         1: { cellWidth: 62, halign: 'left' },
                         2: { cellWidth: 26, halign: 'center' },
                         3: { cellWidth: 28, halign: 'center' },
                         4: { cellWidth: 56, halign: 'left' }
-                    },
+                    }
+                    : {
+                        0: { cellWidth: 25, halign: 'center' },
+                        1: { cellWidth: 85, halign: 'center' },
+                        2: { cellWidth: 50, halign: 'center' },
+                        3: { cellWidth: 30, halign: 'center' }
+                    };
+
+                docRoomList.autoTable({
+                    head: headCols,
+                    body: finalTableData,
+                    startY: finalY + 2,
+                    theme: 'grid',
+                    margin: { top: 10, left: 10, right: 10 },
+                    styles: { fontSize: hasObs ? 8.5 : 9, cellPadding: 2, textColor: [0, 0, 0] },
+                    headStyles: { fontStyle: 'bold', halign: 'center', valign: 'middle', fillColor: [77, 104, 82], textColor: 255 },
+                    columnStyles: colStyles,
                     didParseCell: (data) => {
                         if (data.section === 'body') {
                             const meta = roomColorData[data.row.index];
