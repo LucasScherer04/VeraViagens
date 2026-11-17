@@ -58,9 +58,10 @@ async function supabaseFetch(path, options = {}) {
         };
     }
 
+    const isLegacyJwt = supabaseKey.startsWith('eyJ');
     const headers = {
         apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
+        ...(isLegacyJwt ? { Authorization: `Bearer ${supabaseKey}` } : {}),
         'Content-Type': 'application/json',
         ...(options.headers || {})
     };
